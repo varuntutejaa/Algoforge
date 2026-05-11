@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body{
+  min-height: 100vh;
+  color: white;
+  overflow-x: hidden;
+
+  background:
+    radial-gradient(circle at top left, #1f2937, transparent 30%),
+    radial-gradient(circle at bottom right, #111827, transparent 30%),
+    #050505;
+}
+
+/* Navbar */
+
+.navbar{
+  width: 100%;
+  padding: 24px 80px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo{
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.nav-buttons{
+  display: flex;
+  gap: 16px;
+}
+
+.login-btn,
+.signup-btn{
+  padding: 12px 22px;
+  border-radius: 14px;
+
+  border: none;
+  cursor: pointer;
+
+  font-weight: 600;
+
+  transition: 0.25s ease;
+}
+
+.login-btn{
+  background: transparent;
+  color: white;
+
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.login-btn:hover{
+  background: rgba(255,255,255,0.05);
+}
+
+.signup-btn{
+  background: white;
+  color: black;
+}
+
+.signup-btn:hover{
+  transform: translateY(-2px);
+}
+
+/* Hero */
+
+.hero{
+  height: calc(100vh - 90px);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  padding: 20px;
+}
+
+.hero h1{
+  font-size: 76px;
+  line-height: 1.05;
+
+  margin-bottom: 24px;
+
+  letter-spacing: -4px;
+}
+
+.hero p{
+  max-width: 700px;
+
+  font-size: 20px;
+  line-height: 1.7;
+
+  color: #9ca3af;
+
+  margin-bottom: 40px;
+}
+
+.hero-buttons{
+  display: flex;
+  gap: 18px;
+}
+
+.primary-btn,
+.secondary-btn{
+  padding: 16px 30px;
+
+  border-radius: 18px;
+
+  border: none;
+
+  cursor: pointer;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  transition: 0.25s ease;
+}
+
+.primary-btn{
+  background: white;
+  color: black;
+
+  box-shadow:
+    0 10px 30px rgba(255,255,255,0.08);
+}
+
+.primary-btn:hover{
+  transform: translateY(-3px);
+}
+
+.secondary-btn{
+  background: rgba(255,255,255,0.05);
+
+  color: white;
+
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.secondary-btn:hover{
+  background: rgba(255,255,255,0.08);
+}
