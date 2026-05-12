@@ -1,11 +1,3 @@
-/* ============================================================
-   ALGOFORGE — LOGIN JS
-   • Dark / Light theme toggle (persisted in localStorage)
-   • Terminal typewriter animation
-   • Form validation
-   • Password visibility toggle
-   • Submit loading state simulation
-   ============================================================ */
 
 (function () {
   'use strict';
@@ -199,35 +191,56 @@
      5. FORM SUBMIT
   =========================================================== */
   if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
+    loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-      if (!validateForm()) return;
+    if (!validateForm()) return;
 
-      // Show loading state
-      if (submitBtn)  submitBtn.disabled = true;
-      if (btnLabel)   btnLabel.style.display  = 'none';
-      if (btnArrow)   btnArrow.style.display  = 'none';
-      if (btnLoader)  btnLoader.style.display = '';
+    // loading state
+    if (submitBtn) submitBtn.disabled = true;
+    if (btnLabel) btnLabel.style.display = 'none';
+    if (btnArrow) btnArrow.style.display = 'none';
+    if (btnLoader) btnLoader.style.display = '';
+    try {
 
-      // Simulate async login (replace with real API call)
-      setTimeout(() => {
-        // Restore button
+    const response = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+         email: emailInput.value,
+         password: pwInput.value
+}),
+    });
+
+    const data = await response.json();
+
+    console.log(data);
+
+    if (data.success) {
+        window.location.href = "index.html";
+
+    } else {
+
+        alert(data.message);
+
+    }
+
+} catch (error) {
+
+    console.log("FULL ERROR:", error);
+
+}
+ finally {
+        // restore button
         if (submitBtn) submitBtn.disabled = false;
-        if (btnLabel)  btnLabel.style.display  = '';
-        if (btnArrow)  btnArrow.style.display  = '';
+        if (btnLabel) btnLabel.style.display = '';
+        if (btnArrow) btnArrow.style.display = '';
         if (btnLoader) btnLoader.style.display = 'none';
 
-        // Replace this with actual auth logic / redirect
-        console.log('Login submitted:', {
-          email:    emailInput ? emailInput.value.trim() : '',
-          remember: document.getElementById('remember')?.checked ?? false,
-        });
-
-        // Example: show a success message or redirect
-        // window.location.href = '/dashboard';
-      }, 1800);
-    });
+    }
+});
   }
 
   /* ===========================================================
