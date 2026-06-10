@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlgoForge - Code Editor</title>
+  <link rel="icon" href="../../assets/algoforge_favicon_themed.svg" type="image/svg+xml" sizes="any">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="../../assets/favicon-192.png" sizes="192x192" type="image/png">
+  <link rel="icon" href="../../assets/favicon-512.png" sizes="512x512" type="image/png">
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+  <link rel="mask-icon" href="../../assets/algoforge_favicon_themed.svg" color="#0f172a">
+  <meta name="theme-color" content="#050505">
+  <link rel="stylesheet" href="../css/nav.css">
+  <link rel="stylesheet" href="../css/editor.css">
+</head>
+<body>
+  <nav class="app-navbar editor-top-nav">
+    <div class="editor-nav-left">
+      <a class="brand" href="index.html">
+        <img src="../../assets/algoforge_favicon_themed.svg" alt="AlgoForge" class="brand-icon">
+        <span class="brand-text">AlgoForge</span>
+      </a>
+      <a class="back-link" href="problems.html">Back to Problems</a>
+    </div>
+    <div class="nav-center" id="navCenter"></div>
+    <div id="profileNav"></div>
+  </nav>
+
+  <main class="editor-shell">
+    <aside class="question-panel">
+      <div class="problem-header" id="problemHeader">
+      </div>
+
+      <div class="problem-title-row">
+        <h1 id="problemTitle"></h1>
+        <span id="solvedBadge" class="solved-badge hidden">✓ Solved</span>
+      </div>
+      <div id="problemDescription"></div>
+
+      <section class="prompt-block">
+        <h2>Example</h2>
+        <pre id="problemExample"></pre>
+      </section>
+
+      <section class="prompt-block">
+        <h2>Constraints</h2>
+        <ul id="problemConstraints"></ul>
+      </section>
+
+      <!-- AI Hints & Review -->
+      <section class="ai-assist-section" id="aiAssistSection">
+        <div class="ai-assist-header">
+          <span class="ai-assist-icon">✦</span>
+          <span>AI Assist</span>
+        </div>
+
+        <div class="hints-row">
+          <button class="hint-btn locked" id="hint1Btn" data-hint="1" disabled>
+            <span class="hint-lock-icon">🔒</span>
+            <span class="hint-label">Hint 1</span>
+            <span class="hint-unlock-timer" id="hint1Timer">unlocks in 4:00</span>
+          </button>
+          <button class="hint-btn locked" id="hint2Btn" data-hint="2" disabled>
+            <span class="hint-lock-icon">🔒</span>
+            <span class="hint-label">Hint 2</span>
+            <span class="hint-unlock-timer" id="hint2Timer">unlocks in 9:00</span>
+          </button>
+          <button class="hint-btn locked" id="hint3Btn" data-hint="3" disabled>
+            <span class="hint-lock-icon">🔒</span>
+            <span class="hint-label">Hint 3</span>
+            <span class="hint-unlock-timer" id="hint3Timer">unlocks in 14:00</span>
+          </button>
+        </div>
+
+        <button class="review-code-btn" id="reviewCodeBtn">
+          <span>⟳</span> Review My Code
+        </button>
+
+        <div class="ai-response-panel" id="aiResponsePanel" style="display:none">
+          <div class="ai-response-header">
+            <span id="aiResponseTitle">AI Response</span>
+            <button class="ai-response-close" id="aiResponseClose">✕</button>
+          </div>
+          <div class="ai-response-body" id="aiResponseBody">
+            <div class="ai-loading" id="aiLoading">
+              <span class="ai-loading-dot"></span>
+              <span class="ai-loading-dot"></span>
+              <span class="ai-loading-dot"></span>
+            </div>
+            <div id="aiResponseText" style="display:none"></div>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div id="dragger" class="splitter" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize panels"></div>
+
+    <section class="code-panel">
+      <div class="code-toolbar">
+        <div class="code-timer" id="aiTimer" aria-live="polite" title="Time spent on this problem">00:00</div>
+        
+        <label for="language">Language</label>
+        <select id="language" class="language-select">
+          <option value="c">C</option>
+          <option value="cpp" selected>C++</option>
+          <option value="java">Java</option>
+          <option value="js">JavaScript</option>
+        </select>
+      </div>
+
+      <div id="codeEditor" class="code-editor" role="textbox" aria-label="Code editor"></div>
+
+      <div class="editor-actions">
+        <button class="run-btn" id="runBtn" type="button">Run Code</button>
+        <button class="submit-btn" id="submitBtn" type="button">Submit</button>
+      </div>
+
+      <section class="results-panel" id="resultsPanel" aria-live="polite">
+        <p class="results-empty" id="resultsEmpty">Run your code to evaluate the test cases.</p>
+      </section>
+    </section>
+  </main>
+  <!-- Splitter between question-panel and code-panel (added for resizable panels) -->
+  <!-- The visual splitter element is placed inside the layout between the two panels. -->
+
+  <script src="../scripts/design/nav.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <script src="../scripts/problem/editor.js"></script>
+</body>
+</html>

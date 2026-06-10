@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlgoForge - Dashboard</title>
+  <link rel="icon" href="../../assets/algoforge_favicon_themed.svg" type="image/svg+xml" sizes="any">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="../../assets/favicon-192.png" sizes="192x192" type="image/png">
+  <link rel="icon" href="../../assets/favicon-512.png" sizes="512x512" type="image/png">
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+  <link rel="mask-icon" href="../../assets/algoforge_favicon_themed.svg" color="#0f172a">
+  <meta name="theme-color" content="#050505">
+  <link rel="stylesheet" href="../css/nav.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+</head>
+<body>
+  <nav class="app-navbar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/algoforge_favicon_themed.svg" alt="AlgoForge" class="brand-icon">
+      <span class="brand-text">AlgoForge</span>
+    </a>
+    <div class="nav-center" id="navCenter"></div>
+    <div id="profileNav"></div>
+  </nav>
+
+  <main class="dashboard-page">
+    <header class="dashboard-header">
+      <span class="section-kicker">Profile & Analytics</span>
+      <h1>Dashboard</h1>
+      <p>Track your progress, streaks, and solved problems.</p>
+    </header>
+
+    <section class="profile-card" id="profileCard">
+      <p class="loading-text">Loading profile...</p>
+    </section>
+
+    <section class="stats-grid" id="statsGrid"></section>
+
+    <section class="dashboard-grid">
+      <article class="panel">
+        <h2>Difficulty Breakdown</h2>
+        <div class="breakdown-list" id="difficultyBreakdown"></div>
+      </article>
+
+      <article class="panel">
+        <h2>Topic Breakdown</h2>
+        <div class="breakdown-list" id="topicBreakdown"></div>
+      </article>
+    </section>
+
+    <section class="panel heatmap-panel">
+      <div class="panel-heading">
+        <h2>Submission Heatmap</h2>
+        <p>Accepted submissions over the last 365 days</p>
+      </div>
+      <div class="heatmap-wrap" id="heatmap"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Recent Activity</h2>
+      <div class="activity-list" id="recentActivity"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Solved Problems</h2>
+      <div class="solved-list" id="solvedProblems"></div>
+    </section>
+  </main>
+
+  <script src="../scripts/design/nav.js"></script>
+  <script src="../scripts/dashboard/dashboard.js"></script>
+</body>
+</html>

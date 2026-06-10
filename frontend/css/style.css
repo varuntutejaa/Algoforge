@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body{
+  min-height: 100vh;
+  color: white;
+  overflow-x: hidden;
+
+  background:
+    radial-gradient(circle at top left, #1f2937, transparent 30%),
+    radial-gradient(circle at bottom right, #111827, transparent 30%),
+    #050505;
+}
+
+/* Navbar */
+
+.navbar{
+  width: 100%;
+  padding: 24px 80px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo{
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.nav-buttons{
+  display: flex;
+  gap: 16px;
+}
+
+.login-btn,
+.signup-btn{
+  padding: 12px 22px;
+  border-radius: 14px;
+
+  border: none;
+  cursor: pointer;
+
+  font-weight: 600;
+
+  transition: 0.25s ease;
+}
+
+.login-btn{
+  background: white;
+  color: black;
+
+  border: 1px solid white;
+}
+
+.login-btn:hover{
+  transform: translateY(-2px);
+}
+.signup-btn{
+  background: white;
+  color: black;
+}
+
+.signup-btn:hover{
+  transform: translateY(-2px);
+}
+
+/* Hero */
+
+.hero{
+  min-height: calc(82vh - 90px);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  padding: 20px;
+}
+
+.hero h1{
+  font-size: 76px;
+  line-height: 1.05;
+
+  margin-bottom: 24px;
+
+  letter-spacing: 0;
+}
+
+.hero p{
+  max-width: 700px;
+
+  font-size: 20px;
+  line-height: 1.7;
+
+  color: #9ca3af;
+
+  margin-bottom: 40px;
+}
+
+.hero-buttons{
+  display: flex;
+  gap: 18px;
+}
+
+.primary-btn,
+.secondary-btn{
+  padding: 16px 30px;
+
+  border-radius: 18px;
+
+  border: none;
+
+  cursor: pointer;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  transition: 0.25s ease;
+}
+
+.primary-btn{
+  background: white;
+  color: black;
+
+  box-shadow:
+    0 10px 30px rgba(255,255,255,0.08);
+}
+
+.primary-btn:hover{
+  transform: translateY(-3px);
+}
+
+.secondary-btn{
+  background: rgba(255,255,255,0.05);
+
+  color: white;
+
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.secondary-btn:hover{
+  background: rgba(255,255,255,0.08);
+}
+
+/* Problems */
+
+.problems-section{
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto 80px;
+  padding: 48px 0 70px;
+}
+
+/* Home components centered on landing page */
+.home-components{ }
+
+.section-heading{
+  max-width: 680px;
+  margin-bottom: 28px;
+}
+
+.section-kicker{
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.section-heading h2{
+  font-size: 46px;
+  line-height: 1.1;
+  margin-bottom: 14px;
+}
+
+.section-heading p{
+  color: #9ca3af;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.problem-card{
+  width: 100%;
+  padding: 28px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+}
+
+.problem-meta{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.problem-meta span{
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.22);
+}
+
+.problem-meta .easy{
+  color: #86efac;
+  border-color: rgba(134,239,172,0.28);
+}
+
+.problem-card h3{
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+.problem-card p{
+  max-width: 760px;
+  color: #a7b0c0;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.problem-footer{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-top: 26px;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.solve-btn{
+  padding: 13px 20px;
+  border: none;
+  border-radius: 8px;
+  background: white;
+  color: #050505;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.25s ease;
+}
+
+.solve-btn:hover{
+  transform: translateY(-2px);
+}
+
+@media (max-width: 760px){
+  .navbar{
+    padding: 20px;
+  }
+
+  .hero{
+    min-height: auto;
+    padding: 74px 20px 58px;
+  }
+
+  .hero h1{
+    font-size: 48px;
+    letter-spacing: 0;
+  }
+
+  .hero p{
+    font-size: 17px;
+  }
+
+  .hero-buttons,
+  .problem-footer{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primary-btn,
+  .secondary-btn,
+  .solve-btn{
+    width: 100%;
+  }
+
+  .section-heading h2{
+    font-size: 34px;
+  }
+
+  .problem-card{
+    padding: 22px;
+  }
+}

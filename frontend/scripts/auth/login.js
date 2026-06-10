@@ -1,8 +1,6 @@
 
 (function () {
   'use strict';
-
-  /* ---- Selectors ---- */
   const html        = document.documentElement;
   const themeToggle = document.getElementById('themeToggle');
   const loginForm   = document.getElementById('loginForm');
@@ -20,6 +18,42 @@
   const btnLoader   = document.getElementById('btnLoader');
   const btnArrow    = submitBtn && submitBtn.querySelector('.btn-arrow');
   const termText    = document.getElementById('terminalText');
+  let firebaseAuth = null;
+
+  function markAuthenticated(user) {
+    localStorage.setItem("algoforge-auth", "true");
+
+    if (user) {
+      localStorage.setItem("algoforge-user", JSON.stringify({
+        id: user.id || user.uid || "",
+        uid: user.uid || user.id || "",
+        name: user.name || user.displayName || "",
+        email: user.email || "",
+        photoURL: user.photoURL || ""
+      }));
+    }
+  }
+
+  function initFirebaseAuth() {
+    if (!window.firebase || !window.algoforgeFirebaseConfig) {
+      return null;
+    }
+
+    const config = window.algoforgeFirebaseConfig;
+
+    if (!config.apiKey || config.apiKey.includes("PASTE_")) {
+      console.warn("Firebase config is missing. Update firebase-config.js with your Firebase project values.");
+      return null;
+    }
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(config);
+    }
+
+    return firebase.auth();
+  }
+
+  firebaseAuth = initFirebaseAuth();
 
   /* ===========================================================
      1. THEME TOGGLE
@@ -57,9 +91,6 @@
     });
   }
 
-  /* ===========================================================
-     2. TERMINAL TYPEWRITER
-  =========================================================== */
   const lines = [
     'run build --target=prod',
     'analyse O(n log n) sort',
@@ -113,9 +144,7 @@
 
   typeWriter();
 
-  /* ===========================================================
-     3. PASSWORD TOGGLE
-  =========================================================== */
+
   if (pwToggle && pwInput) {
     pwToggle.addEventListener('click', () => {
       const isPassword = pwInput.type === 'password';
@@ -136,13 +165,13 @@
   }
 
   function showError(group, errorEl, msg) {
-    group.classList.add('has-error');
-    errorEl.textContent = msg;
+    if (group && group.classList) group.classList.add('has-error');
+    if (errorEl) errorEl.textContent = msg;
   }
 
   function clearError(group, errorEl) {
-    group.classList.remove('has-error');
-    errorEl.textContent = '';
+    if (group && group.classList) group.classList.remove('has-error');
+    if (errorEl) errorEl.textContent = '';
   }
 
   // Live clearing on input
@@ -157,6 +186,8 @@
       clearError(pwGroup, pwError);
     }
   });
+
+  
 
   function validateForm() {
     let valid = true;
@@ -219,7 +250,8 @@
     console.log(data);
 
     if (data.success) {
-        window.location.href = "index.html";
+        markAuthenticated(data.user);
+        window.location.href = "problems.html";
 
     } else {
 
@@ -255,8 +287,32 @@
   });
 
   googleBtn && googleBtn.addEventListener('click', () => {
-    console.log('Google OAuth triggered');
-    // window.location.href = '/auth/google';
+    if (!firebaseAuth) {
+      alert('Firebase is not configured yet. Add your Firebase project values in firebase-config.js.');
+      return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
+    googleBtn.disabled = true;
+    googleBtn.setAttribute('aria-busy', 'true');
+
+    firebaseAuth.signInWithPopup(provider)
+      .then((result) => {
+        markAuthenticated(result.user);
+        window.location.href = 'problems.html';
+      })
+      .catch((error) => {
+        console.log('Google OAuth error:', error);
+        alert(error.message || 'Google sign-in failed');
+      })
+      .finally(() => {
+        googleBtn.disabled = false;
+        googleBtn.removeAttribute('aria-busy');
+      });
   });
 
 })();
