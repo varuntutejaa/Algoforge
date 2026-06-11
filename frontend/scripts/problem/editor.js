@@ -18,6 +18,7 @@ const languageSelect = document.getElementById('language');
 const codeEditorContainer = document.getElementById('codeEditor');
 const runBtn = document.getElementById('runBtn');
 const submitBtn = document.getElementById('submitBtn');
+const resetBtn = document.getElementById('resetBtn');
 const resultsPanel = document.getElementById('resultsPanel');
 const problemHeader = document.getElementById('problemHeader');
 const problemTitle = document.getElementById('problemTitle');
@@ -447,6 +448,14 @@ if (runBtn) {
 
 if (submitBtn) {
   submitBtn.addEventListener('click', submitSolution);
+}
+
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    if (!monacoEditor || !problem) return;
+    monacoEditor.setValue(getBoilerplate(languageSelect.value));
+    showToast('Editor reset to boilerplate', 'info', 1500);
+  });
 }
 
 window.addEventListener('beforeunload', () => {

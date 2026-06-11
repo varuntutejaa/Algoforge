@@ -118,18 +118,38 @@ function renderHeatmap(activity) {
   const start = new Date(end);
   start.setDate(start.getDate() - (days - 1));
 
-  const cells = [];
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const CELL = 18; // 14px cell + 4px gap
+  const startDow = start.getDay(); // 0=Sun, offset for first partial week
 
-  for (let index = 0; index < days; index += 1) {
+  const cells = [];
+  const monthLabels = [];
+  let lastMonth = -1;
+
+  for (let i = 0; i < days; i++) {
     const date = new Date(start);
-    date.setDate(start.getDate() + index);
+    date.setDate(start.getDate() + i);
+    const month = date.getMonth();
+    const col = Math.floor((i + startDow) / 7);
+
+    if (month !== lastMonth) {
+      monthLabels.push({ col, label: MONTH_NAMES[month] });
+      lastMonth = month;
+    }
+
     const key = date.toISOString().slice(0, 10);
     const count = activityMap.get(key) || 0;
-    const level = getHeatLevel(count);
-    cells.push(`<div class="heat-cell level-${level}" title="${key}: ${count} accepted"></div>`);
+    cells.push(`<div class="heat-cell level-${getHeatLevel(count)}" title="${key}: ${count} accepted"></div>`);
   }
 
-  heatmap.innerHTML = `<div class="heatmap-grid">${cells.join('')}</div>`;
+  const monthsHtml = monthLabels.map(({ col, label }) =>
+    `<span style="left:${col * CELL}px">${label}</span>`
+  ).join('');
+
+  heatmap.innerHTML = `
+    <div class="heatmap-months">${monthsHtml}</div>
+    <div class="heatmap-grid">${cells.join('')}</div>
+  `;
 }
 
 function renderRecentActivity(solved) {

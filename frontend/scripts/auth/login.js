@@ -225,6 +225,14 @@
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
+    const origHtml = googleBtn.innerHTML;
+    const restoreBtn = () => {
+      googleBtn.innerHTML = origHtml;
+      googleBtn.disabled = false;
+      googleBtn.removeAttribute('aria-busy');
+    };
+
+    googleBtn.innerHTML = '<span class="btn-loader" style="display:inline-block;flex-shrink:0"></span>Signing in…';
     googleBtn.disabled = true;
     googleBtn.setAttribute('aria-busy', 'true');
 
@@ -234,39 +242,54 @@
         await handleGoogleResult(result.user);
       } else {
         showOAuthError('Google sign-in returned no user. Try again.');
-        googleBtn.disabled = false;
-        googleBtn.removeAttribute('aria-busy');
+        restoreBtn();
       }
     } catch (error) {
       console.error('[Google Auth] signInWithPopup error:', error.code, error.message, error);
 
       if (error.code === 'auth/popup-blocked') {
-        showOAuthError('Popup was blocked by your browser. Redirecting to Google instead…');
+        googleBtn.innerHTML = '<span class="btn-loader" style="display:inline-block;flex-shrink:0"></span>Redirecting to Google…';
         setTimeout(() => firebaseAuth.signInWithRedirect(provider), 1500);
         return;
       }
 
       if (error.code === 'auth/popup-closed-by-user') {
-        googleBtn.disabled = false;
-        googleBtn.removeAttribute('aria-busy');
+        restoreBtn();
         return;
       }
 
       showOAuthError(`[${error.code || 'error'}] ${error.message || 'Google sign-in failed'}`);
-      googleBtn.disabled = false;
-      googleBtn.removeAttribute('aria-busy');
+      restoreBtn();
     }
   });
 
   // Handle redirect result (fallback path when popup was blocked)
-  if (firebaseAuth) {
+  if (firebaseAuth && googleBtn) {
+    let redirectPending = true;
+    const origHtml = googleBtn.innerHTML;
+
+    // Show loading in the button after a short delay — only fires if redirect is actually pending
+    const loadingTimer = setTimeout(() => {
+      if (!redirectPending) return;
+      googleBtn.innerHTML = '<span class="btn-loader" style="display:inline-block;flex-shrink:0"></span>Completing sign-in…';
+      googleBtn.disabled = true;
+    }, 150);
+
     firebaseAuth.getRedirectResult()
       .then(async (result) => {
+        redirectPending = false;
+        clearTimeout(loadingTimer);
+        googleBtn.innerHTML = origHtml;
+        googleBtn.disabled = false;
         if (result && result.user) {
           await handleGoogleResult(result.user);
         }
       })
       .catch((error) => {
+        redirectPending = false;
+        clearTimeout(loadingTimer);
+        googleBtn.innerHTML = origHtml;
+        googleBtn.disabled = false;
         console.error('[Google Auth] getRedirectResult error:', error.code, error.message);
         if (error.code !== 'auth/popup-closed-by-user') {
           showOAuthError(`[${error.code || 'error'}] ${error.message || 'Google sign-in failed'}`);

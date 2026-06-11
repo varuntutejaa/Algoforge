@@ -627,6 +627,19 @@ body {
   cursor: not-allowed;
 }
 
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.btn-ghost:hover {
+  color: #f8fafc;
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.04);
+}
+
 /* Override Monaco editor theme */
 .code-editor-wrap .monaco-editor {
   --vscode-editor-background: #0a0a0a !important;
