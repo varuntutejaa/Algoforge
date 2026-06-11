@@ -7,44 +7,43 @@ const signupForm = document.getElementById("signupForm");
 
 signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = document.getElementById("name").value;
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+    const name            = document.getElementById("name").value;
+    const email           = document.getElementById("email").value;
+    const password        = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
+    const submitBtn       = document.getElementById("submitBtn");
+    const btnLabel        = document.getElementById("submitBtn")?.querySelector(".btn-label");
+    const btnLoader       = document.getElementById("btnLoader");
 
     if (password !== confirmPassword) {
-        alert("Passwords do not match");
+        showToast("Passwords do not match", "error");
         return;
     }
 
-    try {
-        // 1. Create user in Firebase
-        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
-        const firebaseUser = userCredential.user;
+    if (submitBtn) submitBtn.disabled = true;
+    if (btnLabel)  btnLabel.style.display  = "none";
+    if (btnLoader) btnLoader.style.display = "";
 
-        // 2. Update Firebase profile with display name
+    try {
+        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+        const firebaseUser   = userCredential.user;
+
         await firebaseUser.updateProfile({ displayName: name });
 
-        // 3. Get Firebase ID token
         const idToken = await firebaseUser.getIdToken();
 
-        // 4. Send token to backend to create MongoDB profile
-        const response = await fetch(
-            `${API_BASE_URL}/api/auth/signup`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ name })
-            }
-        );
+        const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ name })
+        });
 
         const data = await response.json();
 
         if (data.success) {
-            // Store user info and ID token in localStorage
             localStorage.setItem("algoforge-auth", "true");
             localStorage.setItem("algoforge-id-token", idToken);
             localStorage.setItem("algoforge-user", JSON.stringify({
@@ -53,14 +52,17 @@ signupForm.addEventListener("submit", async (e) => {
                 name: data.user.name,
                 email: data.user.email
             }));
-            alert("Signup Successful");
-            window.location.href = "problems.html";
+            showToast("Account created! Redirecting…", "success");
+            setTimeout(() => { window.location.href = "problems.html"; }, 1000);
         } else {
-            alert(data.message || "Signup failed");
+            showToast(data.message || "Signup failed", "error");
         }
     } catch (error) {
-        console.log(error);
-        // Firebase error messages are user-friendly
-        alert(error.message || "Server Error");
+        console.error(error);
+        showToast(error.message || "Server error. Please try again.", "error");
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (btnLabel)  btnLabel.style.display  = "";
+        if (btnLoader) btnLoader.style.display = "none";
     }
 });

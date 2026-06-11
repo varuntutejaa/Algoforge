@@ -149,6 +149,7 @@ async function saveCode({ keepalive = false } = {}) {
 
     lastSavedContent = sourceCode;
     hasUnsavedChanges = false;
+    if (!keepalive) showToast('Code saved', 'success', 2000);
     return true;
   } catch (error) {
     console.log(error);

@@ -233,23 +233,19 @@
     if (btnLoader) btnLoader.style.display = '';
     
     try {
-      // 1. Sign in with Firebase
       if (!firebaseAuth) {
-        alert('Firebase is not configured. Please check your firebase-config.js.');
+        showToast('Firebase is not configured. Check firebase-config.js.', 'error');
         return;
       }
-      
+
       const userCredential = await firebaseAuth.signInWithEmailAndPassword(
         emailInput.value,
         pwInput.value
       );
-      
+
       const firebaseUser = userCredential.user;
-      
-      // 2. Get Firebase ID token
       const idToken = await firebaseUser.getIdToken();
-      
-      // 3. Send token to backend to get/create MongoDB profile
+
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
@@ -261,22 +257,21 @@
       const data = await response.json();
 
       if (data.success) {
-        // Store the ID token for subsequent API calls
         localStorage.setItem("algoforge-id-token", idToken);
         markAuthenticated(data.user);
-        window.location.href = "problems.html";
+        showToast('Welcome back!', 'success');
+        setTimeout(() => { window.location.href = "problems.html"; }, 800);
       } else {
-        alert(data.message || "Login failed");
+        showToast(data.message || "Login failed", "error");
       }
     } catch (error) {
-      console.log("FULL ERROR:", error);
-      alert(error.message || "Login failed. Check your credentials.");
+      console.error("Login error:", error);
+      showToast(error.message || "Login failed. Check your credentials.", "error");
     } finally {
-        // restore button
-        if (submitBtn) submitBtn.disabled = false;
-        if (btnLabel) btnLabel.style.display = '';
-        if (btnArrow) btnArrow.style.display = '';
-        if (btnLoader) btnLoader.style.display = 'none';
+      if (submitBtn) submitBtn.disabled = false;
+      if (btnLabel)  btnLabel.style.display  = '';
+      if (btnArrow)  btnArrow.style.display  = '';
+      if (btnLoader) btnLoader.style.display = 'none';
     }
 });
   }
@@ -292,21 +287,13 @@
     // window.location.href = '/auth/github';
   });
 
-  const oauthError = document.getElementById('oauthError');
-
   function showOAuthError(msg) {
     console.error('[Google Auth]', msg);
-    if (oauthError) {
-      oauthError.textContent = msg;
-      oauthError.style.display = 'block';
-    }
+    showToast(msg, 'error');
   }
 
   function clearOAuthError() {
-    if (oauthError) {
-      oauthError.textContent = '';
-      oauthError.style.display = 'none';
-    }
+    // errors now auto-dismiss via toast
   }
 
   async function handleGoogleResult(user) {

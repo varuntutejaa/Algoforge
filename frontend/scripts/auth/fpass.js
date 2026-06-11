@@ -1,32 +1,23 @@
 const forgotForm = document.getElementById("forgotForm");
 
 forgotForm.addEventListener("submit", async (e) => {
-
     e.preventDefault();
+    const email = document.getElementById("email").value.trim();
 
-    const email =
-    document.getElementById("email").value;
-
-    try {
-        // Use Firebase to send password reset email
-        if (!window.firebase || !window.algoforgeFirebaseConfig) {
-            alert("Firebase is not configured. Please check your firebase-config.js.");
-            return;
-        }
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(window.algoforgeFirebaseConfig);
-        }
-
-        await firebase.auth().sendPasswordResetEmail(email);
-        
-        alert("Password reset email sent. Please check your inbox.");
-
-    } catch (error) {
-
-        console.log(error);
-        alert(error.message || "Failed to send password reset email.");
-
+    if (!window.firebase || !window.algoforgeFirebaseConfig) {
+        showToast("Firebase is not configured. Check firebase-config.js.", "error");
+        return;
     }
 
+    if (!firebase.apps.length) {
+        firebase.initializeApp(window.algoforgeFirebaseConfig);
+    }
+
+    try {
+        await firebase.auth().sendPasswordResetEmail(email);
+        showToast("Password reset email sent. Check your inbox.", "success", 6000);
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || "Failed to send password reset email.", "error");
+    }
 });

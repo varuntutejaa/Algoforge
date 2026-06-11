@@ -530,7 +530,7 @@ if (deselectAllProblems) {
 createForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   createBtn.disabled = true;
-  createStatus.textContent = 'Creating contest...';
+  if (createStatus) createStatus.textContent = '';
 
   const title = document.getElementById('contestTitle').value.trim();
   const description = document.getElementById('contestDesc').value.trim();
@@ -540,7 +540,7 @@ createForm.addEventListener('submit', async (e) => {
   const isRandom = problemMode.value === 'random';
 
   if (!title) {
-    createStatus.textContent = 'Please enter a contest title.';
+    showToast('Please enter a contest title.', 'warning');
     createBtn.disabled = false;
     return;
   }
@@ -548,7 +548,7 @@ createForm.addEventListener('submit', async (e) => {
   const startsAt = new Date(`${dateVal}T${timeVal}`);
 
   if (startsAt <= new Date()) {
-    createStatus.textContent = 'Start time must be in the future.';
+    showToast('Start time must be in the future.', 'warning');
     createBtn.disabled = false;
     return;
   }
@@ -561,7 +561,7 @@ createForm.addEventListener('submit', async (e) => {
   } else {
     const checked = [...document.querySelectorAll('input[name="problem"]:checked')].map((cb) => cb.value);
     if (!checked.length) {
-      createStatus.textContent = 'Select at least one problem.';
+      showToast('Select at least one problem.', 'warning');
       createBtn.disabled = false;
       return;
     }
@@ -585,7 +585,7 @@ createForm.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (data.success) {
-      createStatus.textContent = `Contest created! Code: ${data.contest.code}`;
+      showToast(`Contest created! Share this code: <strong>${data.contest.code}</strong>`, 'success', 8000);
       createForm.reset();
       await initCreateForm();
       await loadMyContests();
@@ -595,10 +595,10 @@ createForm.addEventListener('submit', async (e) => {
         panel.classList.toggle('active', key === 'my');
       });
     } else {
-      createStatus.textContent = data.message || 'Failed to create contest.';
+      showToast(data.message || 'Failed to create contest.', 'error');
     }
   } catch {
-    createStatus.textContent = 'Server error. Make sure the backend is running on the deployed backend.';
+    showToast('Could not reach the server. Check your connection.', 'error');
   } finally {
     createBtn.disabled = false;
   }
@@ -608,12 +608,12 @@ createForm.addEventListener('submit', async (e) => {
 joinBtn.addEventListener('click', async () => {
   const code = joinCode.value.trim().toUpperCase();
   if (!code || code.length < 4) {
-    joinStatus.textContent = 'Enter a valid contest code (4-6 characters).';
+    showToast('Enter a valid contest code (4–6 characters).', 'warning');
     return;
   }
 
   joinBtn.disabled = true;
-  joinStatus.textContent = 'Joining...';
+  if (joinStatus) joinStatus.textContent = '';
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/contests/join`, {
@@ -625,7 +625,7 @@ joinBtn.addEventListener('click', async () => {
     const data = await res.json();
 
     if (data.success) {
-      joinStatus.textContent = `Joined "${data.contest.title}"!`;
+      showToast(`Joined "${data.contest.title}"!`, 'success');
       joinCode.value = '';
       await loadMyContests();
       await loadAvailableContests();
@@ -635,10 +635,10 @@ joinBtn.addEventListener('click', async () => {
         panel.classList.toggle('active', key === 'my');
       });
     } else {
-      joinStatus.textContent = data.message || 'Failed to join contest.';
+      showToast(data.message || 'Failed to join contest.', 'error');
     }
   } catch {
-    joinStatus.textContent = 'Server error. Make sure the backend is running on the deployed backend.';
+    showToast('Could not reach the server. Check your connection.', 'error');
   } finally {
     joinBtn.disabled = false;
   }
