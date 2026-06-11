@@ -790,9 +790,32 @@ app.get("/api/health", (req, res) => {
     const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
     const firebaseAdmin = require('./firebase-admin');
     const privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
+
+    // Try to re-initialize Firebase Admin to capture error
+    let initError = null;
+    if (!firebaseAdmin && hasProjectId && hasClientEmail && hasPrivateKey) {
+        try {
+            const admin = require('firebase-admin');
+            let formattedKey = privateKey;
+            if (formattedKey.includes("\\n")) {
+                formattedKey = formattedKey.replace(/\\n/g, "\n");
+            }
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: formattedKey,
+                }),
+            });
+        } catch (e) {
+            initError = e.message;
+        }
+    }
+
     res.json({
         success: true,
         firebaseConfigured: !!firebaseAdmin,
+        initError,
         envVars: {
             FIREBASE_PROJECT_ID: hasProjectId,
             FIREBASE_CLIENT_EMAIL: hasClientEmail,
