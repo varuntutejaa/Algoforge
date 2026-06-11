@@ -2,7 +2,6 @@ const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const bcrypt = require("bcryptjs");
 const User = require('./models/users');
 const Problem = require('./models/Problem');
 const Submission = require('./models/Submission');
@@ -17,6 +16,7 @@ const {
     loadRequestUser
 } = require('./utils/profileHelpers');
 const contestRoutes = require('./routes/contests');
+const { verifyFirebaseToken, optionalAuth } = require('./middleware/auth');
 
 require("dotenv").config();
 const app = express();
@@ -32,36 +32,6 @@ const languageIds = {
     java: 62,
     js: 63
 };
-
-const demoUser = {
-    email: "demo@algoforge.ai",
-    password: "demo123",
-    name: "Demo User"
-};
-
-function formatUserResponse(user) {
-    return {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email
-    };
-}
-
-async function findOrCreateDemoUser() {
-    let user = await User.findOne({ email: demoUser.email });
-
-    if (!user) {
-        const hashedPassword = await bcrypt.hash(demoUser.password, 10);
-        user = await User.create({
-            name: demoUser.name,
-            email: demoUser.email,
-            password: hashedPassword
-        });
-    }
-
-    ensureUserProfileFields(user);
-    return user;
-}
 
 function buildTwoSumJudgeSource(language, sourceCode) {
     if (language === "c") {
@@ -813,102 +783,43 @@ connectWithRetry();
 // Mount contest routes
 app.use('/api/contests', contestRoutes);
 
-// signup
-app.post("/signup", async (req, res) => {
-    try {
-        const { name, email, password } = req.body;
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.json({
-                success: false,
-                message: "User already exists"
-            });
+// Auth route: verify Firebase token and create/return user profile
+app.post("/api/auth/login", verifyFirebaseToken, async (req, res) => {
+    const user = req.user;
+    res.json({
+        success: true,
+        message: "Login successful",
+        user: {
+            id: user._id.toString(),
+            firebaseUid: user.firebaseUid,
+            name: user.name,
+            email: user.email,
+            profilePicture: user.profilePicture,
+            rating: user.rating
         }
-        // hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        // create user
-        const user = new User({
-            name,
-            email,
-            password: hashedPassword
-        });
-        await user.save();
-        res.json({
-            success: true,
-            message: "Signup successful"
-        });
-    } catch (error) {
-        console.log(error);
-        res.json({
-            success: false,
-            message: "Server error"
-        });
-    }
+    });
 });
 
-// login
-app.post("/login", async (req, res) => {
-
-    try {
-
-        const { email, password } = req.body;
-
-        if (email === demoUser.email && password === demoUser.password) {
-            const user = await findOrCreateDemoUser();
-            return res.json({
-                success: true,
-                message: "Demo login successful",
-                user: formatUserResponse(user)
-            });
+// Auth route: create user profile (called after Firebase signup)
+app.post("/api/auth/signup", verifyFirebaseToken, async (req, res) => {
+    const user = req.user;
+    res.json({
+        success: true,
+        message: "Signup successful",
+        user: {
+            id: user._id.toString(),
+            firebaseUid: user.firebaseUid,
+            name: user.name,
+            email: user.email,
+            profilePicture: user.profilePicture
         }
-
-        // find user
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.json({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        // compare passwords
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.json({
-                success: false,
-                message: "Invalid password"
-            });
-        }
-
-        ensureUserProfileFields(user);
-        await user.save();
-
-        res.json({
-            success: true,
-            message: "Login successful",
-            user: formatUserResponse(user)
-        });
-
-    } catch (error) {
-
-        console.log(error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
-
-    }
-
+    });
 });
 
-app.get("/profile", async (req, res) => {
+// Get profile
+app.get("/profile", verifyFirebaseToken, async (req, res) => {
     try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
+        const user = req.user;
         res.json({
             success: true,
             profile: formatProfile(user)
@@ -922,11 +833,10 @@ app.get("/profile", async (req, res) => {
     }
 });
 
-app.get("/profile/solved", async (req, res) => {
+// Get solved problems
+app.get("/profile/solved", verifyFirebaseToken, async (req, res) => {
     try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
+        const user = req.user;
         ensureUserProfileFields(user);
         const solvedIds = user.solvedProblems.map((entry) => entry.problemId);
         const problems = await Problem.find({ id: { $in: solvedIds } }).lean();
@@ -960,11 +870,10 @@ app.get("/profile/solved", async (req, res) => {
     }
 });
 
-app.get("/profile/submissions", async (req, res) => {
+// Get submissions
+app.get("/profile/submissions", verifyFirebaseToken, async (req, res) => {
     try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
+        const user = req.user;
         const filter = { userId: user._id };
         const verdict = req.query.verdict;
 
@@ -998,104 +907,10 @@ app.get("/profile/submissions", async (req, res) => {
     }
 });
 
-async function upsertUserCode(userId, problemId, language, sourceCode) {
-    const saved = await UserCode.findOneAndUpdate(
-        { userId, problemId, language },
-        {
-            userId,
-            problemId,
-            language,
-            sourceCode,
-            updatedAt: new Date()
-        },
-        { upsert: true, returnDocument: "after", runValidators: true }
-    );
-
-    return saved;
-}
-
-app.get("/code/:problemId/:language", async (req, res) => {
+// Get activity heatmap data
+app.get("/profile/activity", verifyFirebaseToken, async (req, res) => {
     try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
-        const { problemId, language } = req.params;
-
-        if (!languageIds[language]) {
-            return res.status(400).json({
-                success: false,
-                message: "Unsupported language"
-            });
-        }
-
-        const savedCode = await UserCode.findOne({
-            userId: user._id,
-            problemId,
-            language
-        }).lean();
-
-        if (!savedCode) {
-            return res.status(404).json({
-                success: false,
-                message: "No saved code"
-            });
-        }
-
-        res.json({
-            success: true,
-            sourceCode: savedCode.sourceCode,
-            updatedAt: savedCode.updatedAt
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to fetch saved code"
-        });
-    }
-});
-
-app.post("/code/save", async (req, res) => {
-    try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
-        const { problemId, language, sourceCode } = req.body;
-
-        if (!problemId || !language || typeof sourceCode !== "string") {
-            return res.status(400).json({
-                success: false,
-                message: "problemId, language, and sourceCode are required"
-            });
-        }
-
-        if (!languageIds[language]) {
-            return res.status(400).json({
-                success: false,
-                message: "Unsupported language"
-            });
-        }
-
-        const saved = await upsertUserCode(user._id, problemId, language, sourceCode);
-
-        res.json({
-            success: true,
-            updatedAt: saved.updatedAt
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to save code"
-        });
-    }
-});
-
-app.get("/profile/activity", async (req, res) => {
-    try {
-        const user = await loadRequestUser(req, res);
-        if (!user) return;
-
+        const user = req.user;
         const days = Number(req.query.days) || 365;
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - (days - 1));
@@ -1136,6 +951,92 @@ app.get("/profile/activity", async (req, res) => {
     }
 });
 
+// Save user code
+app.post("/code/save", verifyFirebaseToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { problemId, language, sourceCode } = req.body;
+
+        if (!problemId || !language || typeof sourceCode !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "problemId, language, and sourceCode are required"
+            });
+        }
+
+        if (!languageIds[language]) {
+            return res.status(400).json({
+                success: false,
+                message: "Unsupported language"
+            });
+        }
+
+        const saved = await UserCode.findOneAndUpdate(
+            { userId: user._id, problemId, language },
+            {
+                userId: user._id,
+                problemId,
+                language,
+                sourceCode,
+                updatedAt: new Date()
+            },
+            { upsert: true, returnDocument: "after", runValidators: true }
+        );
+
+        res.json({
+            success: true,
+            updatedAt: saved.updatedAt
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to save code"
+        });
+    }
+});
+
+// Get saved code
+app.get("/code/:problemId/:language", verifyFirebaseToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { problemId, language } = req.params;
+
+        if (!languageIds[language]) {
+            return res.status(400).json({
+                success: false,
+                message: "Unsupported language"
+            });
+        }
+
+        const savedCode = await UserCode.findOne({
+            userId: user._id,
+            problemId,
+            language
+        }).lean();
+
+        if (!savedCode) {
+            return res.status(404).json({
+                success: false,
+                message: "No saved code"
+            });
+        }
+
+        res.json({
+            success: true,
+            sourceCode: savedCode.sourceCode,
+            updatedAt: savedCode.updatedAt
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch saved code"
+        });
+    }
+});
+
+// Get all problems
 app.get("/problems", async (req, res) => {
     try {
         const problems = await Problem.find().sort({ createdAt: 1 }).lean();
@@ -1160,6 +1061,7 @@ app.get("/problems", async (req, res) => {
     }
 });
 
+// Get single problem by ID
 app.get("/problems/:id", async (req, res) => {
     try {
         const problem = await Problem.findOne({ id: req.params.id });
@@ -1184,6 +1086,7 @@ app.get("/problems/:id", async (req, res) => {
     }
 });
 
+// Create a new problem (admin)
 app.post("/problems", async (req, res) => {
     try {
         const {
@@ -1242,7 +1145,8 @@ app.post("/problems", async (req, res) => {
     }
 });
 
-app.post("/submit-code", async (req, res) => {
+// Submit code for evaluation
+app.post("/submit-code", optionalAuth, async (req, res) => {
     try {
         const { problemId = "two-sum", language, sourceCode, action = "submit" } = req.body;
         const isSubmit = action === "submit";
@@ -1280,45 +1184,53 @@ app.post("/submit-code", async (req, res) => {
         const passed = results.every((result) => result.passed);
         const verdict = getVerdict(results, passed);
         const { runtime, memory } = getSubmissionMetrics(results);
-        const userId = getUserIdFromRequest(req);
+        const user = req.user;
 
-        if (userId && isSubmit) {
-            const user = await User.findById(userId);
+        if (user && isSubmit) {
+            await Submission.create({
+                userId: user._id,
+                problemId: problem.id,
+                problemTitle: problemDoc.title,
+                language,
+                verdict,
+                runtime,
+                memory,
+                sourceCode,
+                submittedAt: new Date()
+            });
 
-            if (user) {
-                await Submission.create({
+            user.totalSubmissions += 1;
+
+            if (passed && verdict === "Accepted") {
+                user.acceptedSubmissions += 1;
+                user.problemsSolved = (user.problemsSolved || 0) + 1;
+                updateStreak(user);
+
+                const alreadySolved = user.solvedProblems.some(
+                    (entry) => entry.problemId === problem.id
+                );
+
+                if (!alreadySolved) {
+                    user.solvedProblems.push({
+                        problemId: problem.id,
+                        solvedAt: new Date()
+                    });
+                }
+            }
+
+            await user.save();
+
+            await UserCode.findOneAndUpdate(
+                { userId: user._id, problemId: problem.id, language },
+                {
                     userId: user._id,
                     problemId: problem.id,
-                    problemTitle: problemDoc.title,
                     language,
-                    verdict,
-                    runtime,
-                    memory,
                     sourceCode,
-                    submittedAt: new Date()
-                });
-
-                user.totalSubmissions += 1;
-
-                if (passed && verdict === "Accepted") {
-                    user.acceptedSubmissions += 1;
-                    updateStreak(user);
-
-                    const alreadySolved = user.solvedProblems.some(
-                        (entry) => entry.problemId === problem.id
-                    );
-
-                    if (!alreadySolved) {
-                        user.solvedProblems.push({
-                            problemId: problem.id,
-                            solvedAt: new Date()
-                        });
-                    }
-                }
-
-                await user.save();
-                await upsertUserCode(user._id, problem.id, language, sourceCode);
-            }
+                    updatedAt: new Date()
+                },
+                { upsert: true }
+            );
         }
 
         res.json({

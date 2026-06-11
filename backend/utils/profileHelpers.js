@@ -94,11 +94,22 @@ function ensureUserProfileFields(user) {
 }
 
 function getUserIdFromRequest(req) {
+    // Use Firebase-authenticated user from middleware if available
+    if (req.user) {
+        return req.user._id;
+    }
     return req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
 }
 
 async function loadRequestUser(req, res) {
     const User = require('../models/users');
+    
+    // If Firebase middleware already loaded the user, use it
+    if (req.user) {
+        ensureUserProfileFields(req.user);
+        return req.user;
+    }
+
     const userId = getUserIdFromRequest(req);
 
     if (!userId) {

@@ -8,31 +8,24 @@ forgotForm.addEventListener("submit", async (e) => {
     document.getElementById("email").value;
 
     try {
+        // Use Firebase to send password reset email
+        if (!window.firebase || !window.algoforgeFirebaseConfig) {
+            alert("Firebase is not configured. Please check your firebase-config.js.");
+            return;
+        }
 
-        const response = await fetch(
-            `${API_BASE_URL}/forgot-password`,
-            {
-                method: "POST",
+        if (!firebase.apps.length) {
+            firebase.initializeApp(window.algoforgeFirebaseConfig);
+        }
 
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-                    email
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        alert(data.message);
+        await firebase.auth().sendPasswordResetEmail(email);
+        
+        alert("Password reset email sent. Please check your inbox.");
 
     } catch (error) {
 
         console.log(error);
-
-        alert("Server Error");
+        alert(error.message || "Failed to send password reset email.");
 
     }
 

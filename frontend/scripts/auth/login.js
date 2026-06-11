@@ -1,4 +1,3 @@
-
 (function () {
   'use strict';
   const html        = document.documentElement;
@@ -219,7 +218,7 @@
   }
 
   /* ===========================================================
-     5. FORM SUBMIT
+     5. FORM SUBMIT - Firebase Auth Login
   =========================================================== */
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
@@ -232,45 +231,50 @@
     if (btnLabel) btnLabel.style.display = 'none';
     if (btnArrow) btnArrow.style.display = 'none';
     if (btnLoader) btnLoader.style.display = '';
+    
     try {
-
-    const response = await fetch(`${API_BASE_URL}/login`, {
+      // 1. Sign in with Firebase
+      if (!firebaseAuth) {
+        alert('Firebase is not configured. Please check your firebase-config.js.');
+        return;
+      }
+      
+      const userCredential = await firebaseAuth.signInWithEmailAndPassword(
+        emailInput.value,
+        pwInput.value
+      );
+      
+      const firebaseUser = userCredential.user;
+      
+      // 2. Get Firebase ID token
+      const idToken = await firebaseUser.getIdToken();
+      
+      // 3. Send token to backend to get/create MongoDB profile
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-         email: emailInput.value,
-         password: pwInput.value
-}),
-    });
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    console.log(data);
-
-    if (data.success) {
+      if (data.success) {
         markAuthenticated(data.user);
         window.location.href = "problems.html";
-
-    } else {
-
-        alert(data.message);
-
-    }
-
-} catch (error) {
-
-    console.log("FULL ERROR:", error);
-
-}
- finally {
+      } else {
+        alert(data.message || "Login failed");
+      }
+    } catch (error) {
+      console.log("FULL ERROR:", error);
+      alert(error.message || "Login failed. Check your credentials.");
+    } finally {
         // restore button
         if (submitBtn) submitBtn.disabled = false;
         if (btnLabel) btnLabel.style.display = '';
         if (btnArrow) btnArrow.style.display = '';
         if (btnLoader) btnLoader.style.display = 'none';
-
     }
 });
   }
@@ -301,9 +305,21 @@
     googleBtn.setAttribute('aria-busy', 'true');
 
     firebaseAuth.signInWithPopup(provider)
-      .then((result) => {
-        markAuthenticated(result.user);
-        window.location.href = 'problems.html';
+      .then(async (result) => {
+        // Get Firebase ID token and authenticate with backend
+        const idToken = await result.user.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`
+          }
+        });
+        const data = await response.json();
+        if (data.success) {
+          markAuthenticated(data.user);
+          window.location.href = 'problems.html';
+        }
       })
       .catch((error) => {
         console.log('Google OAuth error:', error);
