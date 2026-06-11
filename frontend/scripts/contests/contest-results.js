@@ -1,5 +1,4 @@
 (function(){
-  const API_BASE = 'http://localhost:8000';
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
 
@@ -27,7 +26,7 @@
 
   async function load() {
     try {
-      const res = await fetch(`${API_BASE}/api/contests/${encodeURIComponent(code)}`);
+      const res = await fetch(`${API_BASE_URL}/api/contests/${encodeURIComponent(code)}`);
       const data = await res.json();
       if (!data.success) {
         container.innerHTML = `<p style="color:#f87171">${escapeHtml(data.message || 'Contest not found')}</p>`;
@@ -39,7 +38,7 @@
       if (subtitleEl) subtitleEl.textContent = `${escapeHtml(contest.code)} · ${escapeHtml(new Date(contest.startsAt).toLocaleString())} — ${escapeHtml(new Date(contest.endsAt).toLocaleString())}`;
 
       // load leaderboard
-      const lbRes = await fetch(`${API_BASE}/api/contests/${encodeURIComponent(code)}/leaderboard`);
+      const lbRes = await fetch(`${API_BASE_URL}/api/contests/${encodeURIComponent(code)}/leaderboard`);
       const lbData = await lbRes.json();
       if (!lbData.success) {
         if (container) container.innerHTML = `<p style="color:#f87171">Failed to load leaderboard.</p>`;

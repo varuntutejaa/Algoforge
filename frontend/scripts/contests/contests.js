@@ -1,4 +1,3 @@
-const API_BASE = 'http://localhost:8000';
 
 function isAuthenticated() {
   return localStorage.getItem('algoforge-auth') === 'true';
@@ -101,7 +100,7 @@ function getContestStatusLabel(status) {
 
 async function fetchProblems() {
   try {
-    const res = await fetch(`${API_BASE}/problems`);
+    const res = await fetch(`${API_BASE_URL}/problems`);
     const data = await res.json();
     return data.success ? data.problems : [];
   } catch {
@@ -220,7 +219,7 @@ async function loadMyContests() {
   myContestsList.innerHTML = '<p class="loading-text">Loading your contests...</p>';
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests`, {
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -233,7 +232,7 @@ async function loadMyContests() {
     allContests = data.contests;
     renderMyContests();
   } catch {
-    myContestsList.innerHTML = '<p class="empty-state">Could not connect to backend. Start the server on port 8000.</p>';
+    myContestsList.innerHTML = '<p class="empty-state">Could not connect to backend. Start the server on the deployed backend.</p>';
   }
 }
 
@@ -300,7 +299,7 @@ function setupLeaderboardToggles() {
     }
     if (e.currentTarget) e.currentTarget.textContent = 'Loading...';
     try {
-      const res = await fetch(`${API_BASE}/api/contests/${encodeURIComponent(code)}/leaderboard`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/contests/${encodeURIComponent(code)}/leaderboard`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (!data.success) {
         container.innerHTML = `<p style="color:#f87171">Failed to load leaderboard</p>`;
@@ -346,7 +345,7 @@ async function loadAvailableContests() {
   availableContests.innerHTML = '<p class="loading-text">Loading available contests...</p>';
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests/available`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests/available`, {
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -570,7 +569,7 @@ createForm.addEventListener('submit', async (e) => {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests/create`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests/create`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
@@ -599,7 +598,7 @@ createForm.addEventListener('submit', async (e) => {
       createStatus.textContent = data.message || 'Failed to create contest.';
     }
   } catch {
-    createStatus.textContent = 'Server error. Make sure the backend is running on port 8000.';
+    createStatus.textContent = 'Server error. Make sure the backend is running on the deployed backend.';
   } finally {
     createBtn.disabled = false;
   }
@@ -617,7 +616,7 @@ joinBtn.addEventListener('click', async () => {
   joinStatus.textContent = 'Joining...';
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests/join`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests/join`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ code })
@@ -639,7 +638,7 @@ joinBtn.addEventListener('click', async () => {
       joinStatus.textContent = data.message || 'Failed to join contest.';
     }
   } catch {
-    joinStatus.textContent = 'Server error. Make sure the backend is running on port 8000.';
+    joinStatus.textContent = 'Server error. Make sure the backend is running on the deployed backend.';
   } finally {
     joinBtn.disabled = false;
   }

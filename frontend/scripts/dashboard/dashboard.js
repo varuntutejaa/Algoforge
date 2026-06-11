@@ -1,4 +1,3 @@
-const API_BASE = 'http://localhost:8000';
 
 function isAuthenticated() {
   return localStorage.getItem('algoforge-auth') === 'true';
@@ -202,9 +201,9 @@ async function loadDashboard() {
     const headers = getAuthHeaders();
     const query = getProfileQuery();
     const [profileRes, solvedRes, activityRes] = await Promise.all([
-      fetch(`${API_BASE}/profile${query}`, { headers }),
-      fetch(`${API_BASE}/profile/solved${query}`, { headers }),
-      fetch(`${API_BASE}/profile/activity${query}`, { headers })
+      fetch(`${API_BASE_URL}/profile${query}`, { headers }),
+      fetch(`${API_BASE_URL}/profile/solved${query}`, { headers }),
+      fetch(`${API_BASE_URL}/profile/activity${query}`, { headers })
     ]);
 
     const profileData = await profileRes.json();
@@ -229,7 +228,7 @@ async function loadDashboard() {
     renderSolvedList(solved);
     renderHeatmap(activityData.success ? activityData.activity : []);
   } catch (error) {
-    showDashboardError('Could not load dashboard. Make sure the backend is running on port 8000, then log in again.');
+    showDashboardError('Could not load dashboard. Make sure the backend is running on the deployed backend, then log in again.');
     console.log(error);
   }
 }

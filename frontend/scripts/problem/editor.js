@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000';
+/* API_BASE_URL_URL is defined in config.js — loaded via <script> tag */
 const AUTO_SAVE_INTERVAL_MS = 5000;
 
 function isAuthenticated() {
@@ -79,7 +79,7 @@ async function loadSolvedStatus() {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/profile/solved`, {
+    const response = await fetch(`${API_BASE_URL}/profile/solved`, {
       headers: getAuthHeaders()
     });
     const data = await response.json();
@@ -97,7 +97,7 @@ async function fetchSavedCode(language) {
 
   try {
     const response = await fetch(
-      `${API_BASE}/code/${encodeURIComponent(problem.id)}/${encodeURIComponent(language)}`,
+      `${API_BASE_URL}/code/${encodeURIComponent(problem.id)}/${encodeURIComponent(language)}`,
       { headers: getAuthHeaders() }
     );
 
@@ -134,7 +134,7 @@ async function saveCode({ keepalive = false } = {}) {
   };
 
   try {
-    const response = await fetch(`${API_BASE}/code/save`, {
+    const response = await fetch(`${API_BASE_URL}/code/save`, {
       method: 'POST',
       headers: getAuthHeaders({
         'Content-Type': 'application/json'
@@ -303,7 +303,7 @@ async function executeCode(action) {
 
   try {
     const user = getCurrentUser();
-    const response = await fetch(`${API_BASE}/submit-code`, {
+    const response = await fetch(`${API_BASE_URL}/submit-code`, {
       method: 'POST',
       headers: getAuthHeaders({
         'Content-Type': 'application/json'
@@ -320,7 +320,7 @@ async function executeCode(action) {
     const data = await response.json();
     renderResults(data, { isSubmit });
   } catch (error) {
-    resultsPanel.innerHTML = '<p class="error-text">Could not connect to the backend server. Start it on port 8000 and try again.</p>';
+    resultsPanel.innerHTML = '<p class="error-text">Could not connect to the backend server. Start it on the deployed backend and try again.</p>';
     console.log(error);
   } finally {
     setLoading(false, action);
@@ -378,7 +378,7 @@ async function initMonaco() {
     const currentCode = monacoEditor.getValue();
     if (canPersistCode() && currentCode !== lastSavedContent) {
       const user = getCurrentUser();
-      await fetch(`${API_BASE}/code/save`, {
+      await fetch(`${API_BASE_URL}/code/save`, {
         method: 'POST',
         headers: getAuthHeaders({
           'Content-Type': 'application/json'
@@ -409,7 +409,7 @@ async function loadProblem() {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/problems/${encodeURIComponent(problemId)}`);
+    const response = await fetch(`${API_BASE_URL}/problems/${encodeURIComponent(problemId)}`);
     const data = await response.json();
 
     if (!response.ok || !data.success) {
@@ -434,7 +434,7 @@ async function loadProblem() {
     require(['vs/editor/editor.main'], initMonaco);
   } catch (error) {
     if (resultsPanel) {
-      resultsPanel.innerHTML = '<p class="error-text">Could not load this problem. Start the backend on port 8000 and run npm run seed.</p>';
+      resultsPanel.innerHTML = '<p class="error-text">Could not load this problem. Start the backend on the deployed backend and run npm run seed.</p>';
     }
     console.log(error);
   }
@@ -455,7 +455,7 @@ window.addEventListener('beforeunload', () => {
 
   const user = getCurrentUser();
 
-  fetch(`${API_BASE}/code/save`, {
+  fetch(`${API_BASE_URL}/code/save`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({

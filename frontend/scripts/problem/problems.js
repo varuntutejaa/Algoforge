@@ -1,4 +1,3 @@
-const API_BASE = 'http://localhost:8000';
 
 function isAuthenticated() {
   return localStorage.getItem('algoforge-auth') === 'true';
@@ -130,7 +129,7 @@ if (difficultyFilters) {
 
 async function loadSolvedIds() {
   try {
-    const response = await fetch(`${API_BASE}/profile/solved`, {
+    const response = await fetch(`${API_BASE_URL}/profile/solved`, {
       headers: getAuthHeaders()
     });
     const data = await response.json();
@@ -148,7 +147,7 @@ async function loadProblems() {
 
   try {
     const [problemsResponse, solved] = await Promise.all([
-      fetch(`${API_BASE}/problems`),
+      fetch(`${API_BASE_URL}/problems`),
       loadSolvedIds()
     ]);
     const data = await problemsResponse.json();
@@ -162,7 +161,7 @@ async function loadProblems() {
     initTagFilters();
     renderProblemsList();
   } catch (error) {
-    problemsList.innerHTML = '<p class="problems-empty">Could not load problems. Start the backend on port 8000.</p>';
+    problemsList.innerHTML = '<p class="problems-empty">Could not load problems. Start the backend on the deployed backend.</p>';
     console.log(error);
   }
 }

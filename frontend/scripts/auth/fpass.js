@@ -10,7 +10,7 @@ forgotForm.addEventListener("submit", async (e) => {
     try {
 
         const response = await fetch(
-            "http://localhost:8000/forgot-password",
+            `${API_BASE_URL}/forgot-password`,
             {
                 method: "POST",
 

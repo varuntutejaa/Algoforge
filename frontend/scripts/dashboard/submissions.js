@@ -1,4 +1,3 @@
-const API_BASE = 'http://localhost:8000';
 
 function isAuthenticated() {
   return localStorage.getItem('algoforge-auth') === 'true';
@@ -60,7 +59,7 @@ async function loadSubmissions() {
   try {
     const verdict = verdictFilter.value;
     const query = verdict !== 'All' ? `?verdict=${encodeURIComponent(verdict)}` : '';
-    const response = await fetch(`${API_BASE}/profile/submissions${query}`, {
+    const response = await fetch(`${API_BASE_URL}/profile/submissions${query}`, {
       headers: getAuthHeaders()
     });
     const data = await response.json();

@@ -11,7 +11,7 @@ signupForm.addEventListener("submit", async (e) => {
     }
     try{
         const response = await fetch(
-            "http://localhost:8000/signup",
+            `${API_BASE_URL}/signup`,
             {
                 method:"POST",
                 headers:{

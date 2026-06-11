@@ -1,4 +1,3 @@
-const API_BASE = 'http://localhost:8000';
 
 function isAuthenticated() {
   return localStorage.getItem('algoforge-auth') === 'true';
@@ -145,7 +144,7 @@ async function loadContest() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests/${contestCode}`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests/${contestCode}`, {
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -237,7 +236,7 @@ async function loadContest() {
     document.getElementById('arena').innerHTML = `
       <div class="arena-error">
         <p>Could not load contest: ${escapeHtml(errDetails)}</p>
-        <p style="font-size:12px;color:#64748b">API: ${escapeHtml(API_BASE)} | Code: ${escapeHtml(contestCode || 'none')} | User: ${escapeHtml(JSON.stringify(getCurrentUser()))}</p>
+        <p style="font-size:12px;color:#64748b">API: ${escapeHtml(API_BASE_URL)} | Code: ${escapeHtml(contestCode || 'none')} | User: ${escapeHtml(JSON.stringify(getCurrentUser()))}</p>
         <a href="contests.html" class="btn btn-primary">Back to Contests</a>
       </div>
     `;
@@ -488,7 +487,7 @@ async function loadProblemDetails(index) {
   if (probTitle) probTitle.textContent = `#${index + 1}: ${problem.title}`;
 
   try {
-    const res = await fetch(`${API_BASE}/problems/${encodeURIComponent(problem.problemId)}`);
+    const res = await fetch(`${API_BASE_URL}/problems/${encodeURIComponent(problem.problemId)}`);
     const data = await res.json();
 
     if (!data.success) {
@@ -597,7 +596,7 @@ async function executeCode(action) {
   resultsOverlay.classList.add('open');
 
   try {
-    const res = await fetch(`${API_BASE}/submit-code`, {
+    const res = await fetch(`${API_BASE_URL}/submit-code`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
@@ -647,7 +646,7 @@ async function executeCode(action) {
       solvedProblems.add(problemId);
 
       // Notify contest backend
-      await fetch(`${API_BASE}/api/contests/${contestCode}/submit`, {
+      await fetch(`${API_BASE_URL}/api/contests/${contestCode}/submit`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
@@ -664,7 +663,7 @@ async function executeCode(action) {
   } catch {
     resultsContent.innerHTML = `
       <p class="results-summary fail" style="background:rgba(248,113,113,0.1);color:#f87171">
-        Server error. Make sure the backend is running on port 8000.
+        Server error. Make sure the backend is running on the deployed backend.
       </p>
     `;
   } finally {
@@ -692,7 +691,7 @@ async function loadLeaderboard() {
   if (!contestCode) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/contests/${contestCode}/leaderboard`, {
+    const res = await fetch(`${API_BASE_URL}/api/contests/${contestCode}/leaderboard`, {
       headers: getAuthHeaders()
     });
     const data = await res.json();
