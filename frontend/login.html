@@ -1,40 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AlgoForge — Login</title>
+  <title>AlgoForge — Sign In</title>
   <link rel="icon" href="./assets/algoforge_favicon_themed.svg" type="image/svg+xml" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="./assets/algoforge_favicon_themed.svg">
-  <link rel="shortcut icon" href="./assets/algoforge_favicon_themed.svg">
-  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="./assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="./assets/favicon-192.png" sizes="192x192" type="image/png">
+  <link rel="icon" href="./assets/favicon-512.png" sizes="512x512" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="mask-icon" href="./assets/algoforge_favicon_themed.svg" color="#050505">
   <meta name="theme-color" content="#050505">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="./css/nav.css">
   <link rel="stylesheet" href="./css/login.css" />
 </head>
 <body>
-  <div class="bg-grid"></div>
-  <div class="bg-glow"></div>
-  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
-    <span class="toggle-icon sun-icon">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="5"/>
-        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-      </svg>
-    </span>
-    <div class="toggle-track">
-      <div class="toggle-thumb"></div>
-    </div>
-    <span class="toggle-icon moon-icon">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-      </svg>
-    </span>
-  </button>
+
+  <nav class="app-navbar">
+    <a class="brand" href="index.html">
+      <img src="./assets/algoforge_favicon_themed.svg" alt="AlgoForge" class="brand-icon">
+      <span class="brand-text">AlgoForge</span>
+    </a>
+  </nav>
 
   <main class="page auth-page">
 
@@ -66,7 +55,7 @@
           <div class="field-group" id="passwordGroup">
             <label for="password" class="field-label">
               Password
-              <a href="signup.html" class="forgot-link">Forgot?</a>
+              <a href="fpass.html" class="forgot-link">Forgot?</a>
             </label>
             <div class="field-wrap">
               <svg class="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -140,7 +129,5 @@
   <script src="./scripts/config.js?v=2"></script>
   <script src="./scripts/auth/firebase-config.js"></script>
   <script src="./scripts/auth/login.js?v=3"></script>
-  <script src="./scripts/design/nav.js"></script>
-  <script>if (window.initAppNav) initAppNav();</script>
 </body>
 </html>
