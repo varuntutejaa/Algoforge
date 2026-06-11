@@ -32,6 +32,7 @@ const splitterLeft = document.getElementById('splitterLeft');
 const splitterRight = document.getElementById('splitterRight');
 const panelToggle = document.getElementById('panelToggle');
 const splitterCenter = document.getElementById('splitterCenter');
+const timeProgressBar = document.getElementById('timeProgressBar');
 const problemSection = document.querySelector('.arena-problem');
 const codeSection = document.querySelector('.code-section');
 
@@ -84,15 +85,25 @@ function updateTimer() {
 
   const now = new Date();
   const endsAt = new Date(contest.endsAt);
+  const startsAt = new Date(contest.startsAt);
   const diff = endsAt - now;
+  const total = endsAt - startsAt;
+
+  // Progress bar — shows remaining time as a percentage
+  if (timeProgressBar && total > 0) {
+    const pct = Math.max(0, Math.min(100, (diff / total) * 100));
+    timeProgressBar.style.width = `${pct}%`;
+    const cls = diff < 300000 ? 'urgent' : diff < 600000 ? 'warn' : '';
+    timeProgressBar.className = `time-progress-bar${cls ? ' ' + cls : ''}`;
+  }
 
   if (diff <= 0) {
     if (arenaTimer) {
       arenaTimer.textContent = '00:00';
       if (arenaTimer.classList) arenaTimer.classList.add('urgent');
     }
+    if (timeProgressBar) timeProgressBar.style.width = '0%';
     clearInterval(timerInterval);
-    // Contest ended - disable buttons
     if (runBtn) runBtn.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
     return;
@@ -103,19 +114,11 @@ function updateTimer() {
   const mins = Math.floor((totalSecs % 3600) / 60);
   const secs = totalSecs % 60;
 
-  if (hrs > 0) {
-    if (arenaTimer) arenaTimer.textContent = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  } else {
-    if (arenaTimer) arenaTimer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-
-  // Urgent when less than 5 minutes
   if (arenaTimer) {
-    if (diff < 300000) {
-      if (arenaTimer.classList) arenaTimer.classList.add('urgent');
-    } else {
-      if (arenaTimer.classList) arenaTimer.classList.remove('urgent');
-    }
+    arenaTimer.textContent = hrs > 0
+      ? `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+      : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    arenaTimer.classList.toggle('urgent', diff < 300000);
   }
 }
 
@@ -637,20 +640,14 @@ async function executeCode(action) {
       </div>
     `;
 
-    // If submitted and accepted, update solved status + notify backend
-    if (isSubmit && passed && verdict === 'Accepted') {
-      solvedProblems.add(problemId);
+    // Notify backend for all submissions (accepted = +100, wrong = -10)
+    if (isSubmit) {
+      if (passed && verdict === 'Accepted') solvedProblems.add(problemId);
 
-      // Notify contest backend
       await fetch(`${API_BASE_URL}/api/contests/${contestCode}/submit`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          problemId,
-          language,
-          sourceCode,
-          verdict
-        })
+        body: JSON.stringify({ problemId, language, sourceCode, verdict })
       });
 
       renderProblemList();
@@ -706,11 +703,15 @@ async function loadLeaderboard() {
     leaderboardList.innerHTML = data.leaderboard.map((entry) => {
       const isSelf = entry.name === user?.name || entry.name === user?.email;
       const rankClass = entry.rank <= 3 ? `top-${entry.rank}` : '';
+      const penaltyStr = entry.penalty < 0 ? `<span class="leaderboard-penalty">${entry.penalty}</span>` : '';
+      const solved = (entry.solvedProblems || []).length;
       return `
         <div class="leaderboard-item ${isSelf ? 'self' : ''}">
           <span class="leaderboard-rank ${rankClass}">${entry.rank}</span>
           <span class="leaderboard-name ${entry.rank === 1 ? 'top-leader' : ''}">${escapeHtml(entry.name)}</span>
+          <span class="leaderboard-solved">${solved}✓</span>
           <span class="leaderboard-score">${entry.score}</span>
+          ${penaltyStr}
           <span class="leaderboard-time">${entry.timeTakenSeconds != null ? formatDuration(entry.timeTakenSeconds) : '--'}</span>
         </div>
       `;

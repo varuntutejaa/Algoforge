@@ -122,8 +122,7 @@ router.get("/:code/leaderboard", async (req, res) => {
 
     const leaderboard = contest.participants
       .slice()
-      .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
-      .map((p, index) => {
+      .map((p) => {
         const finishedAt = p.finishedAt || null;
         let timeTakenSeconds = null;
         try {
@@ -131,16 +130,24 @@ router.get("/:code/leaderboard", async (req, res) => {
             timeTakenSeconds = Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000));
           }
         } catch (e) { timeTakenSeconds = null; }
-
         return {
-          rank: index + 1,
           name: p.name,
           score: Number(p.score) || 0,
+          penalty: Number(p.penalty) || 0,
+          wrongAttempts: Number(p.wrongAttempts) || 0,
           solvedProblems: p.solvedProblems || [],
-          finishedAt: finishedAt,
+          finishedAt,
           timeTakenSeconds
         };
-      });
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        // tiebreaker: fewer wrong attempts, then faster finish
+        if (a.wrongAttempts !== b.wrongAttempts) return a.wrongAttempts - b.wrongAttempts;
+        if (a.timeTakenSeconds != null && b.timeTakenSeconds != null) return a.timeTakenSeconds - b.timeTakenSeconds;
+        return 0;
+      })
+      .map((p, index) => ({ rank: index + 1, ...p }));
 
     res.json({ success: true, leaderboard });
   } catch (error) {
@@ -314,12 +321,21 @@ router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "You are not a participant in this contest" });
     }
 
-    // If accepted and not already solved this problem
-    if (verdict === "Accepted" && !participant.solvedProblems.includes(problemId)) {
-      if (!Array.isArray(participant.solvedProblems)) participant.solvedProblems = [];
-      participant.solvedProblems.push(problemId);
-      if (typeof participant.score !== 'number' || Number.isNaN(participant.score)) participant.score = 0;
-      participant.score = Number(participant.score) + 1;
+    const alreadySolved = participant.solvedProblems.includes(problemId);
+
+    if (!alreadySolved) {
+      if (verdict === "Accepted") {
+        // +100 per solved problem
+        if (!Array.isArray(participant.solvedProblems)) participant.solvedProblems = [];
+        participant.solvedProblems.push(problemId);
+        if (typeof participant.score !== 'number' || Number.isNaN(participant.score)) participant.score = 0;
+        participant.score = Number(participant.score) + 100;
+      } else {
+        // -10 per wrong attempt on unsolved problem
+        participant.score = (Number(participant.score) || 0) - 10;
+        participant.penalty = (Number(participant.penalty) || 0) - 10;
+        participant.wrongAttempts = (Number(participant.wrongAttempts) || 0) + 1;
+      }
     }
 
     // Check if all problems solved - mark finished

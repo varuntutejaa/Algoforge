@@ -143,6 +143,30 @@ body {
   50% { opacity: 0.6; }
 }
 
+/* Time progress bar */
+.time-progress-wrap {
+  height: 3px;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.time-progress-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  transition: width 1s linear, background-color 0.8s ease;
+  transform-origin: left;
+}
+
+.time-progress-bar.warn {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.time-progress-bar.urgent {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
 /* Main layout */
 .arena-body {
   display: flex;
@@ -499,17 +523,30 @@ body {
   text-underline-offset: 4px;
 }
 
+.leaderboard-solved {
+  font-size: 11px;
+  font-weight: 700;
+  color: #22c55e;
+  min-width: 20px;
+}
+
 .leaderboard-score {
   font-size: 14px;
   font-weight: 800;
   color: #f8fafc;
 }
 
+.leaderboard-penalty {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f87171;
+}
+
 .leaderboard-time {
-  font-size: 12px;
+  font-size: 11px;
   color: #94a3b8;
-  margin-left: 8px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Results panel */

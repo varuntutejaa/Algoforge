@@ -6,6 +6,8 @@ const contestParticipantSchema = new mongoose.Schema(
     name: { type: String, required: true },
     score: { type: Number, default: 0 },
     solvedProblems: { type: [String], default: [] },
+    penalty: { type: Number, default: 0 },       // cumulative deduction (-10 per wrong attempt)
+    wrongAttempts: { type: Number, default: 0 },  // total wrong submissions
     finishedAt: { type: Date, default: null }
   },
   { _id: false }
