@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="frontend/assets/algoforge_favicon_themed.svg" width="72" alt="AlgoForge logo" />
+<img src="frontend/assets/algoforge_favicon_themed.svg" width="120" alt="AlgoForge logo" />
 
 # AlgoForge
 
