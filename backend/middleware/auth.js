@@ -1,4 +1,4 @@
-const admin = require("../firebase-admin");
+const firebaseAdmin = require("../firebase-admin");
 const User = require("../models/users");
 
 /**
@@ -21,8 +21,15 @@ async function verifyFirebaseToken(req, res, next) {
       });
     }
 
+    if (!firebaseAdmin) {
+      return res.status(501).json({
+        success: false,
+        message: "Authentication service not configured. Server admin needs to set Firebase env vars."
+      });
+    }
+
     const idToken = authHeader.split(" ")[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
     const firebaseUid = decodedToken.uid;
     const email = decodedToken.email || "";
     const name = decodedToken.name || decodedToken.email?.split("@")[0] || "User";
@@ -80,8 +87,14 @@ async function optionalAuth(req, res, next) {
       return next();
     }
 
+    if (!firebaseAdmin) {
+      req.user = null;
+      req.firebaseUid = null;
+      return next();
+    }
+
     const idToken = authHeader.split(" ")[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
     const firebaseUid = decodedToken.uid;
     const email = decodedToken.email || "";
     const name = decodedToken.name || decodedToken.email?.split("@")[0] || "User";
