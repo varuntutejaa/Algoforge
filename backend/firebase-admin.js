@@ -1,5 +1,7 @@
 const admin = require("firebase-admin");
 
+console.log("VERSION_JUNE_11_FIREBASE_FIX");
+
 let firebaseAdmin = null;
 
 try {
@@ -7,23 +9,11 @@ try {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  console.log("Firebase Admin Environment Check:");
-  console.log("PROJECT_ID:", !!projectId);
-  console.log("CLIENT_EMAIL:", !!clientEmail);
-  console.log("PRIVATE_KEY:", !!privateKey);
+  let formattedKey = privateKey.replace(/\\n/g, "\n");
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "Missing one or more Firebase Admin environment variables."
-    );
-  }
-
-  let formattedKey = privateKey;
-
-  // Convert escaped newlines to actual newlines
-  formattedKey = formattedKey.replace(/\\n/g, "\n");
-
-  if (!admin.apps.length) {
+  try {
+    admin.app();
+  } catch {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId,
@@ -37,8 +27,7 @@ try {
   console.log("✅ Firebase Admin SDK initialized successfully");
 } catch (error) {
   console.error("❌ Firebase Admin SDK initialization failed");
-  console.error("Message:", error.message);
-  console.error("Stack:", error.stack);
+  console.error(error);
 }
 
 module.exports = firebaseAdmin;
