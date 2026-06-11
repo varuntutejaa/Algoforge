@@ -20,11 +20,7 @@ const contestRoutes = require('./routes/contests');
 
 require("dotenv").config();
 const app = express();
-app.use(cors({
-    origin: true,
-    credentials: true,
-    exposedHeaders: ["x-user-id"]
-}));
+app.use(cors());
 app.use(express.json());
 
 const JUDGE0_URL = process.env.JUDGE0_URL || "https://ce.judge0.com";
@@ -1354,5 +1350,5 @@ app.use(express.static(path.join(frontendRoot, "pages")));
 
 app.listen(8000, () => {
     console.log("Server running on 8000");
-    console.log("Frontend: http://localhost:8000/index.html");
+    console.log("Frontend: https://algoforge-1-mbk5.onrender.com/index.html");
 });
