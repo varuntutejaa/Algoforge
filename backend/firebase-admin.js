@@ -5,39 +5,40 @@ let firebaseAdmin = null;
 try {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    if (projectId && clientEmail && privateKey) {
-      // Handle both literal \n and actual newlines in the private key
-      let formattedKey = privateKey;
-      if (formattedKey.includes("\\n")) {
-        formattedKey = formattedKey.replace(/\\n/g, "\n");
-      }
-      // Ensure the key has proper BEGIN/END markers
-      if (!formattedKey.includes("-----BEGIN PRIVATE KEY-----")) {
-        formattedKey = "-----BEGIN PRIVATE KEY-----\n" + formattedKey + "\n-----END PRIVATE KEY-----";
-      }
+  console.log("Firebase Admin Environment Check:");
+  console.log("PROJECT_ID:", !!projectId);
+  console.log("CLIENT_EMAIL:", !!clientEmail);
+  console.log("PRIVATE_KEY:", !!privateKey);
 
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: projectId,
-          clientEmail: clientEmail,
-          privateKey: formattedKey,
-        }),
-      });
-    }
-    firebaseAdmin = admin;
-    console.log("Firebase Admin SDK initialized successfully");
-  } else {
-    console.warn("Firebase Admin SDK: Missing env vars. Auth middleware will reject tokens.");
-    console.warn("  FIREBASE_PROJECT_ID:", !!projectId);
-    console.warn("  FIREBASE_CLIENT_EMAIL:", !!clientEmail);
-    console.warn("  FIREBASE_PRIVATE_KEY:", !!privateKey);
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      "Missing one or more Firebase Admin environment variables."
+    );
   }
+
+  let formattedKey = privateKey;
+
+  // Convert escaped newlines to actual newlines
+  formattedKey = formattedKey.replace(/\\n/g, "\n");
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: formattedKey,
+      }),
+    });
+  }
+
+  firebaseAdmin = admin;
+  console.log("✅ Firebase Admin SDK initialized successfully");
 } catch (error) {
-  console.error("Firebase Admin SDK initialization failed:", error.message);
-  console.error("Firebase Admin SDK initialization error stack:", error.stack);
+  console.error("❌ Firebase Admin SDK initialization failed");
+  console.error("Message:", error.message);
+  console.error("Stack:", error.stack);
 }
 
 module.exports = firebaseAdmin;
