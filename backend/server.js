@@ -780,46 +780,22 @@ mongoose.connection.on('disconnected', () => console.warn('Mongoose connection: 
 
 connectWithRetry();
 
-// Mount contest routes
-app.use('/api/contests', contestRoutes);
+// Mount contest routes (optionalAuth so Firebase token is verified when present)
+app.use('/api/contests', optionalAuth, contestRoutes);
 
 // Debug endpoint: check if Firebase env vars are set (remove in production)
 app.get("/api/health", (req, res) => {
-    const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
-    const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
-    const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
     const firebaseAdmin = require('./firebase-admin');
     const privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
 
-    // Try to re-initialize Firebase Admin to capture error
-    let initError = null;
-    if (!firebaseAdmin && hasProjectId && hasClientEmail && hasPrivateKey) {
-        try {
-            const admin = require('firebase-admin');
-            let formattedKey = privateKey;
-            if (formattedKey.includes("\\n")) {
-                formattedKey = formattedKey.replace(/\\n/g, "\n");
-            }
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: formattedKey,
-                }),
-            });
-        } catch (e) {
-            initError = e.message;
-        }
-    }
-
     res.json({
         success: true,
-        firebaseConfigured: !!firebaseAdmin,
-        initError,
+        firebaseConfigured: firebaseAdmin.isInitialized,
+        initError: firebaseAdmin.initError,
         envVars: {
-            FIREBASE_PROJECT_ID: hasProjectId,
-            FIREBASE_CLIENT_EMAIL: hasClientEmail,
-            FIREBASE_PRIVATE_KEY: hasPrivateKey,
+            FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
+            FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
+            FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
             privateKeyLength: privateKey.length,
             privateKeyHasBegin: privateKey.includes("-----BEGIN PRIVATE KEY-----"),
             privateKeyHasEnd: privateKey.includes("-----END PRIVATE KEY-----"),

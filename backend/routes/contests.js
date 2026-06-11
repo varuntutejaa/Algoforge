@@ -4,6 +4,7 @@ const Contest = require("../models/Contest");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
 const { loadRequestUser, ensureUserProfileFields, getUserIdFromRequest } = require("../utils/profileHelpers");
+const { verifyFirebaseToken } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -149,7 +150,7 @@ router.get("/:code/leaderboard", async (req, res) => {
 });
 
 // POST /api/contests/create - Create a new contest
-router.post("/create", async (req, res) => {
+router.post("/create", verifyFirebaseToken, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -233,7 +234,7 @@ router.post("/create", async (req, res) => {
 });
 
 // POST /api/contests/join - Join a contest by code
-router.post("/join", async (req, res) => {
+router.post("/join", verifyFirebaseToken, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -286,7 +287,7 @@ router.post("/join", async (req, res) => {
 });
 
 // POST /api/contests/:code/submit - Submit a solution within a contest
-router.post("/:code/submit", async (req, res) => {
+router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;

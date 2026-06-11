@@ -1,4 +1,4 @@
-require("../firebase-admin");
+const firebaseAdmin = require("../firebase-admin");
 const { getAuth } = require("firebase-admin/auth");
 const User = require("../models/users");
 
@@ -6,6 +6,16 @@ const User = require("../models/users");
  * Middleware: verifyFirebaseToken
  */
 async function verifyFirebaseToken(req, res, next) {
+  if (req.user) return next();
+
+  if (!firebaseAdmin.isInitialized) {
+    console.error("verifyFirebaseToken: Firebase Admin not initialized:", firebaseAdmin.initError);
+    return res.status(503).json({
+      success: false,
+      message: "Authentication service is unavailable. Server misconfiguration.",
+    });
+  }
+
   try {
     const authHeader = req.headers.authorization;
 
@@ -75,6 +85,12 @@ async function verifyFirebaseToken(req, res, next) {
  * Middleware: optionalAuth
  */
 async function optionalAuth(req, res, next) {
+  if (!firebaseAdmin.isInitialized) {
+    req.user = null;
+    req.firebaseUid = null;
+    return next();
+  }
+
   try {
     const authHeader = req.headers.authorization;
 
