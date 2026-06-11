@@ -783,6 +783,23 @@ connectWithRetry();
 // Mount contest routes
 app.use('/api/contests', contestRoutes);
 
+// Debug endpoint: check if Firebase env vars are set (remove in production)
+app.get("/api/health", (req, res) => {
+    const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
+    const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
+    const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
+    const firebaseAdmin = require('./firebase-admin');
+    res.json({
+        success: true,
+        firebaseConfigured: !!firebaseAdmin,
+        envVars: {
+            FIREBASE_PROJECT_ID: hasProjectId,
+            FIREBASE_CLIENT_EMAIL: hasClientEmail,
+            FIREBASE_PRIVATE_KEY: hasPrivateKey
+        }
+    });
+});
+
 // Auth route: verify Firebase token and create/return user profile
 app.post("/api/auth/login", verifyFirebaseToken, async (req, res) => {
     const user = req.user;
