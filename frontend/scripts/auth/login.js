@@ -292,8 +292,27 @@
     // window.location.href = '/auth/github';
   });
 
+  const oauthError = document.getElementById('oauthError');
+
+  function showOAuthError(msg) {
+    console.error('[Google Auth]', msg);
+    if (oauthError) {
+      oauthError.textContent = msg;
+      oauthError.style.display = 'block';
+    }
+  }
+
+  function clearOAuthError() {
+    if (oauthError) {
+      oauthError.textContent = '';
+      oauthError.style.display = 'none';
+    }
+  }
+
   async function handleGoogleResult(user) {
+    console.log('[Google Auth] got Firebase user, fetching id token...');
     const idToken = await user.getIdToken();
+    console.log('[Google Auth] calling /api/auth/login...');
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: {
@@ -302,18 +321,27 @@
       }
     });
     const data = await response.json();
+    console.log('[Google Auth] backend response:', response.status, data);
     if (data.success) {
       localStorage.setItem("algoforge-id-token", idToken);
       markAuthenticated(data.user);
       window.location.href = 'problems.html';
     } else {
-      throw new Error(data.message || 'Google sign-in failed');
+      showOAuthError(`Sign-in failed (${response.status}): ${data.message || 'Unknown error'}`);
     }
   }
 
   googleBtn && googleBtn.addEventListener('click', async () => {
+    clearOAuthError();
+
     if (!firebaseAuth) {
-      alert('Firebase is not configured yet. Add your Firebase project values in firebase-config.js.');
+      showOAuthError('Firebase is not initialised. Check the browser console for details.');
+      console.error('[Google Auth] firebaseAuth is null — Firebase SDK may not have loaded.');
+      return;
+    }
+
+    if (!firebase.auth || !firebase.auth.GoogleAuthProvider) {
+      showOAuthError('Firebase Auth SDK did not load. Try refreshing the page.');
       return;
     }
 
@@ -322,20 +350,35 @@
 
     googleBtn.disabled = true;
     googleBtn.setAttribute('aria-busy', 'true');
+    console.log('[Google Auth] calling signInWithPopup...');
 
     try {
       const result = await firebaseAuth.signInWithPopup(provider);
+      console.log('[Google Auth] signInWithPopup result:', result);
       if (result && result.user) {
         await handleGoogleResult(result.user);
+      } else {
+        showOAuthError('Google sign-in returned no user. Try again.');
+        googleBtn.disabled = false;
+        googleBtn.removeAttribute('aria-busy');
       }
     } catch (error) {
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-        // Popup was blocked by browser — fall back to redirect flow
-        firebaseAuth.signInWithRedirect(provider);
+      console.error('[Google Auth] signInWithPopup error:', error.code, error.message, error);
+
+      if (error.code === 'auth/popup-blocked') {
+        showOAuthError('Popup was blocked by your browser. Redirecting to Google instead…');
+        setTimeout(() => firebaseAuth.signInWithRedirect(provider), 1500);
         return;
       }
-      console.error('Google sign-in error:', error);
-      alert(error.message || 'Google sign-in failed');
+
+      if (error.code === 'auth/popup-closed-by-user') {
+        clearOAuthError();
+        googleBtn.disabled = false;
+        googleBtn.removeAttribute('aria-busy');
+        return;
+      }
+
+      showOAuthError(`[${error.code || 'error'}] ${error.message || 'Google sign-in failed'}`);
       googleBtn.disabled = false;
       googleBtn.removeAttribute('aria-busy');
     }
@@ -345,14 +388,15 @@
   if (firebaseAuth) {
     firebaseAuth.getRedirectResult()
       .then(async (result) => {
+        console.log('[Google Auth] getRedirectResult:', result);
         if (result && result.user) {
           await handleGoogleResult(result.user);
         }
       })
       .catch((error) => {
-        console.error('Google OAuth redirect error:', error);
+        console.error('[Google Auth] getRedirectResult error:', error.code, error.message);
         if (error.code !== 'auth/popup-closed-by-user') {
-          alert(error.message || 'Google sign-in failed');
+          showOAuthError(`[${error.code || 'error'}] ${error.message || 'Google sign-in failed'}`);
         }
       });
   }
