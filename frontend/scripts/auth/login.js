@@ -292,47 +292,65 @@
     // window.location.href = '/auth/github';
   });
 
-  googleBtn && googleBtn.addEventListener('click', () => {
+  async function handleGoogleResult(user) {
+    const idToken = await user.getIdToken();
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      }
+    });
+    const data = await response.json();
+    if (data.success) {
+      localStorage.setItem("algoforge-id-token", idToken);
+      markAuthenticated(data.user);
+      window.location.href = 'problems.html';
+    } else {
+      throw new Error(data.message || 'Google sign-in failed');
+    }
+  }
+
+  googleBtn && googleBtn.addEventListener('click', async () => {
     if (!firebaseAuth) {
       alert('Firebase is not configured yet. Add your Firebase project values in firebase-config.js.');
       return;
     }
 
     const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     googleBtn.disabled = true;
     googleBtn.setAttribute('aria-busy', 'true');
 
-    // Use signInWithRedirect to avoid Cross-Origin-Opener-Policy issues
-    firebaseAuth.signInWithRedirect(provider);
+    try {
+      const result = await firebaseAuth.signInWithPopup(provider);
+      if (result && result.user) {
+        await handleGoogleResult(result.user);
+      }
+    } catch (error) {
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+        // Popup was blocked by browser — fall back to redirect flow
+        firebaseAuth.signInWithRedirect(provider);
+        return;
+      }
+      console.error('Google sign-in error:', error);
+      alert(error.message || 'Google sign-in failed');
+      googleBtn.disabled = false;
+      googleBtn.removeAttribute('aria-busy');
+    }
   });
 
-  // Handle redirect result on page load
+  // Handle redirect result (fallback path when popup was blocked)
   if (firebaseAuth) {
     firebaseAuth.getRedirectResult()
       .then(async (result) => {
         if (result && result.user) {
-          const idToken = await result.user.getIdToken();
-          const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${idToken}`
-            }
-          });
-          const data = await response.json();
-          if (data.success) {
-            localStorage.setItem("algoforge-id-token", idToken);
-            markAuthenticated(data.user);
-            window.location.href = 'problems.html';
-          }
+          await handleGoogleResult(result.user);
         }
       })
       .catch((error) => {
-        console.log('Google OAuth redirect error:', error);
+        console.error('Google OAuth redirect error:', error);
         if (error.code !== 'auth/popup-closed-by-user') {
           alert(error.message || 'Google sign-in failed');
         }
