@@ -77,14 +77,6 @@ function getCurrentUser() {
   return typeof getAlgoforgeUser === 'function' ? getAlgoforgeUser() : null;
 }
 
-function getAuthHeaders(extra) {
-  const user = getCurrentUser();
-  const headers = { ...extra };
-  if (user?.id) headers['x-user-id'] = user.id;
-  else if (user?.uid) headers['x-user-id'] = user.uid;
-  return headers;
-}
-
 // --- Countdown timer ---
 function updateTimer() {
   if (!contest) return;

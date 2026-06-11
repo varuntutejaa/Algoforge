@@ -1,7 +1,5 @@
 (function () {
   'use strict';
-  const html        = document.documentElement;
-  const themeToggle = document.getElementById('themeToggle');
   const loginForm   = document.getElementById('loginForm');
   const emailInput  = document.getElementById('email');
   const emailError  = document.getElementById('emailError');
@@ -16,7 +14,6 @@
   const btnLabel    = submitBtn && submitBtn.querySelector('.btn-label');
   const btnLoader   = document.getElementById('btnLoader');
   const btnArrow    = submitBtn && submitBtn.querySelector('.btn-arrow');
-  const termText    = document.getElementById('terminalText');
   let firebaseAuth = null;
 
   function markAuthenticated(user) {
@@ -53,96 +50,6 @@
   }
 
   firebaseAuth = initFirebaseAuth();
-
-  /* ===========================================================
-     1. THEME TOGGLE
-  =========================================================== */
-  const STORAGE_KEY = 'algoforge-theme';
-
-  function getStoredTheme() {
-    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
-  }
-
-  function setStoredTheme(theme) {
-    try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
-  }
-
-  function applyTheme(theme) {
-    html.setAttribute('data-theme', theme);
-    setStoredTheme(theme);
-  }
-
-  // Apply saved or system-preferred theme on load
-  (function initTheme() {
-    const saved = getStoredTheme();
-    if (saved === 'light' || saved === 'dark') {
-      applyTheme(saved);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: light)').matches;
-      applyTheme(prefersDark ? 'dark' : 'light');
-    }
-  })();
-
-  if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      const current = html.getAttribute('data-theme');
-      applyTheme(current === 'dark' ? 'light' : 'dark');
-    });
-  }
-
-  const lines = [
-    'run build --target=prod',
-    'analyse O(n log n) sort',
-    'forge --algo=dijkstra',
-    'connect workspace team-1',
-    'git commit -m "fix merge"',
-  ];
-
-  let lineIdx  = 0;
-  let charIdx  = 0;
-  let deleting = false;
-  let paused   = false;
-
-  function typeWriter() {
-    if (!termText) return;
-
-    const currentLine = lines[lineIdx];
-
-    if (paused) {
-      paused = false;
-      setTimeout(typeWriter, 1200);
-      return;
-    }
-
-    if (!deleting) {
-      // Typing forward
-      charIdx++;
-      termText.textContent = currentLine.slice(0, charIdx);
-
-      if (charIdx === currentLine.length) {
-        paused   = true;
-        deleting = true;
-        setTimeout(typeWriter, 80);
-      } else {
-        setTimeout(typeWriter, 60);
-      }
-    } else {
-      // Deleting
-      charIdx--;
-      termText.textContent = currentLine.slice(0, charIdx);
-
-      if (charIdx === 0) {
-        deleting = false;
-        lineIdx  = (lineIdx + 1) % lines.length;
-        setTimeout(typeWriter, 400);
-      } else {
-        setTimeout(typeWriter, 35);
-      }
-    }
-  }
-
-  typeWriter();
-
 
   if (pwToggle && pwInput) {
     pwToggle.addEventListener('click', () => {
@@ -185,8 +92,6 @@
       clearError(pwGroup, pwError);
     }
   });
-
-  
 
   function validateForm() {
     let valid = true;
@@ -277,29 +182,17 @@
   }
 
   /* ===========================================================
-     6. OAUTH BUTTONS (placeholder handlers)
+     6. GOOGLE OAUTH
   =========================================================== */
-  const githubBtn = document.getElementById('githubBtn');
   const googleBtn = document.getElementById('googleBtn');
-
-  githubBtn && githubBtn.addEventListener('click', () => {
-    console.log('GitHub OAuth triggered');
-    // window.location.href = '/auth/github';
-  });
 
   function showOAuthError(msg) {
     console.error('[Google Auth]', msg);
     showToast(msg, 'error');
   }
 
-  function clearOAuthError() {
-    // errors now auto-dismiss via toast
-  }
-
   async function handleGoogleResult(user) {
-    console.log('[Google Auth] got Firebase user, fetching id token...');
     const idToken = await user.getIdToken();
-    console.log('[Google Auth] calling /api/auth/login...');
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: {
@@ -308,7 +201,6 @@
       }
     });
     const data = await response.json();
-    console.log('[Google Auth] backend response:', response.status, data);
     if (data.success) {
       localStorage.setItem("algoforge-id-token", idToken);
       markAuthenticated(data.user);
@@ -319,8 +211,6 @@
   }
 
   googleBtn && googleBtn.addEventListener('click', async () => {
-    clearOAuthError();
-
     if (!firebaseAuth) {
       showOAuthError('Firebase is not initialised. Check the browser console for details.');
       console.error('[Google Auth] firebaseAuth is null — Firebase SDK may not have loaded.');
@@ -337,11 +227,9 @@
 
     googleBtn.disabled = true;
     googleBtn.setAttribute('aria-busy', 'true');
-    console.log('[Google Auth] calling signInWithPopup...');
 
     try {
       const result = await firebaseAuth.signInWithPopup(provider);
-      console.log('[Google Auth] signInWithPopup result:', result);
       if (result && result.user) {
         await handleGoogleResult(result.user);
       } else {
@@ -359,7 +247,6 @@
       }
 
       if (error.code === 'auth/popup-closed-by-user') {
-        clearOAuthError();
         googleBtn.disabled = false;
         googleBtn.removeAttribute('aria-busy');
         return;
@@ -375,7 +262,6 @@
   if (firebaseAuth) {
     firebaseAuth.getRedirectResult()
       .then(async (result) => {
-        console.log('[Google Auth] getRedirectResult:', result);
         if (result && result.user) {
           await handleGoogleResult(result.user);
         }
