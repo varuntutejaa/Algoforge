@@ -5,14 +5,24 @@ let firebaseAdmin = null;
 try {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (projectId && clientEmail && privateKey) {
-    const serviceAccount = {
-      type: "service_account",
-      project_id: projectId,
-      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || "",
-      private_key: privateKey.replace(/\\n/g, "\n"),
+    if (projectId && clientEmail && privateKey) {
+      // Handle both literal \n and actual newlines in the private key
+      let formattedKey = privateKey;
+      if (formattedKey.includes("\\n")) {
+        formattedKey = formattedKey.replace(/\\n/g, "\n");
+      }
+      // Ensure the key has proper BEGIN/END markers
+      if (!formattedKey.includes("-----BEGIN PRIVATE KEY-----")) {
+        formattedKey = "-----BEGIN PRIVATE KEY-----\n" + formattedKey + "\n-----END PRIVATE KEY-----";
+      }
+
+      const serviceAccount = {
+        type: "service_account",
+        project_id: projectId,
+        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || "",
+        private_key: formattedKey,
       client_email: clientEmail,
       client_id: process.env.FIREBASE_CLIENT_ID || "",
       auth_uri: "https://accounts.google.com/o/oauth2/auth",

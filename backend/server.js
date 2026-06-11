@@ -789,13 +789,19 @@ app.get("/api/health", (req, res) => {
     const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
     const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
     const firebaseAdmin = require('./firebase-admin');
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
     res.json({
         success: true,
         firebaseConfigured: !!firebaseAdmin,
         envVars: {
             FIREBASE_PROJECT_ID: hasProjectId,
             FIREBASE_CLIENT_EMAIL: hasClientEmail,
-            FIREBASE_PRIVATE_KEY: hasPrivateKey
+            FIREBASE_PRIVATE_KEY: hasPrivateKey,
+            privateKeyLength: privateKey.length,
+            privateKeyHasBegin: privateKey.includes("-----BEGIN PRIVATE KEY-----"),
+            privateKeyHasEnd: privateKey.includes("-----END PRIVATE KEY-----"),
+            privateKeyHasLiteralNewlines: privateKey.includes("\\n"),
+            privateKeyHasActualNewlines: privateKey.includes("\n"),
         }
     });
 });
