@@ -29,10 +29,14 @@ try {
     firebaseAdmin = admin;
     console.log("Firebase Admin SDK initialized successfully");
   } else {
-    console.warn("Firebase Admin SDK: Missing env vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Auth middleware will reject tokens.");
+    console.warn("Firebase Admin SDK: Missing env vars. Auth middleware will reject tokens.");
+    console.warn("  FIREBASE_PROJECT_ID:", !!projectId);
+    console.warn("  FIREBASE_CLIENT_EMAIL:", !!clientEmail);
+    console.warn("  FIREBASE_PRIVATE_KEY:", !!privateKey);
   }
 } catch (error) {
   console.error("Firebase Admin SDK initialization failed:", error.message);
+  console.error("Firebase Admin SDK initialization error stack:", error.stack);
 }
 
 module.exports = firebaseAdmin;
