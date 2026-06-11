@@ -304,31 +304,36 @@
     googleBtn.disabled = true;
     googleBtn.setAttribute('aria-busy', 'true');
 
-    firebaseAuth.signInWithPopup(provider)
+    // Use signInWithRedirect to avoid Cross-Origin-Opener-Policy issues
+    firebaseAuth.signInWithRedirect(provider);
+  });
+
+  // Handle redirect result on page load
+  if (firebaseAuth) {
+    firebaseAuth.getRedirectResult()
       .then(async (result) => {
-        // Get Firebase ID token and authenticate with backend
-        const idToken = await result.user.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`
+        if (result && result.user) {
+          const idToken = await result.user.getIdToken();
+          const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            }
+          });
+          const data = await response.json();
+          if (data.success) {
+            markAuthenticated(data.user);
+            window.location.href = 'problems.html';
           }
-        });
-        const data = await response.json();
-        if (data.success) {
-          markAuthenticated(data.user);
-          window.location.href = 'problems.html';
         }
       })
       .catch((error) => {
-        console.log('Google OAuth error:', error);
-        alert(error.message || 'Google sign-in failed');
-      })
-      .finally(() => {
-        googleBtn.disabled = false;
-        googleBtn.removeAttribute('aria-busy');
+        console.log('Google OAuth redirect error:', error);
+        if (error.code !== 'auth/popup-closed-by-user') {
+          alert(error.message || 'Google sign-in failed');
+        }
       });
-  });
+  }
 
 })();
