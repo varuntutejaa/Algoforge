@@ -311,11 +311,14 @@ function initPanels() {
 
   // restore sizes
   const saved = restorePanelSizes();
-  const arenaWidth = document.querySelector('.arena-body').getBoundingClientRect().width;
-  const defaultLeft = Math.min(360, Math.floor(arenaWidth * 0.22));
-  const defaultRight = Math.min(360, Math.floor(arenaWidth * 0.22));
-  const leftW = saved && typeof saved.leftWidth === 'number' ? saved.leftWidth : defaultLeft;
-  const rightW = saved && typeof saved.rightWidth === 'number' ? saved.rightWidth : defaultRight;
+  const arenaWidth = document.querySelector('.arena-body')?.getBoundingClientRect().width || 0;
+  const defaultLeft = arenaWidth > 100 ? Math.min(360, Math.floor(arenaWidth * 0.22)) : 280;
+  const defaultRight = arenaWidth > 100 ? Math.min(360, Math.floor(arenaWidth * 0.22)) : 280;
+  // discard saved sizes that are suspiciously small (collapsed by bad state)
+  const savedLeft = saved && typeof saved.leftWidth === 'number' && saved.leftWidth > 40 ? saved.leftWidth : null;
+  const savedRight = saved && typeof saved.rightWidth === 'number' && saved.rightWidth > 40 ? saved.rightWidth : null;
+  const leftW = savedLeft !== null ? savedLeft : defaultLeft;
+  const rightW = savedRight !== null ? savedRight : defaultRight;
   const defaultTop = Math.max(180, Math.floor(centerPanel.getBoundingClientRect().height * 0.45));
   const centerTop = saved && typeof saved.centerTopHeight === 'number' ? saved.centerTopHeight : defaultTop;
   if (saved && saved.collapsed) {
@@ -355,7 +358,7 @@ function initPanels() {
     if (dragging === 'left' || dragging === 'right') {
       const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
       const dx = clientX - startX;
-      const minW = 120; const maxW = Math.floor(document.querySelector('.arena-body').getBoundingClientRect().width * 0.6);
+      const minW = 120; const maxW = Math.floor((document.querySelector('.arena-body')?.getBoundingClientRect().width || window.innerWidth) * 0.6);
       if (dragging === 'left') {
         let newLeft = Math.max(0, Math.min(maxW, startLeftW + dx));
         applyPanelWidths(newLeft, rightPanel.getBoundingClientRect().width);
@@ -406,7 +409,7 @@ function initPanels() {
   // window resize: clamp and reapply
   window.addEventListener('resize', () => {
     const savedNow = restorePanelSizes();
-    const arenaW = document.querySelector('.arena-body').getBoundingClientRect().width;
+    const arenaW = document.querySelector('.arena-body')?.getBoundingClientRect().width || window.innerWidth;
     const maxW = Math.floor(arenaW * 0.6);
     const l = Math.max(0, Math.min(maxW, (savedNow && savedNow.leftWidth) || defaultLeft));
     const r = Math.max(0, Math.min(maxW, (savedNow && savedNow.rightWidth) || defaultRight));

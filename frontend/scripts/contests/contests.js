@@ -545,7 +545,22 @@ createForm.addEventListener('submit', async (e) => {
     return;
   }
 
-  const startsAt = new Date(`${dateVal}T${timeVal}`);
+  if (!dateVal || !timeVal) {
+    showToast('Please enter both a start date and time.', 'warning');
+    createBtn.disabled = false;
+    return;
+  }
+
+  // Parse as local time regardless of browser/timezone (avoids UTC mis-interpretation)
+  const [yr, mo, dy] = dateVal.split('-').map(Number);
+  const [hr, mn] = timeVal.split(':').map(Number);
+  const startsAt = new Date(yr, mo - 1, dy, hr, mn, 0, 0);
+
+  if (isNaN(startsAt.getTime())) {
+    showToast('Invalid start date or time.', 'warning');
+    createBtn.disabled = false;
+    return;
+  }
 
   if (startsAt <= new Date()) {
     showToast('Start time must be in the future.', 'warning');
