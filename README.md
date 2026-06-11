@@ -6,7 +6,7 @@
 
 **A competitive programming platform built for real contest experience.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-algoforge--1--mbk5.onrender.com-4f8ef7?style=flat-square&logo=render&logoColor=white)](https://algoforge-1-mbk5.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-algoforge--1--mbk5.onrender.com-4f8ef7?style=flat-square&logo=render&logoColor=white)](https://algoforge-lwo9.vercel.app/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?style=flat-square&logo=firebase&logoColor=black)](https://firebase.google.com)
@@ -39,7 +39,7 @@ Auth                  — Email/password + Google OAuth via Firebase
 
 | Layer      | Technology                                      |
 |------------|-------------------------------------------------|
-| Frontend   | Vanilla HTML · CSS · JavaScript (no framework)  |
+| Frontend   | Vanilla HTML · CSS · JavaScript                 |
 | Editor     | Monaco Editor 0.52                              |
 | Backend    | Node.js · Express                               |
 | Database   | MongoDB (Mongoose)                              |
@@ -123,8 +123,6 @@ Update `frontend/scripts/auth/firebase-config.js` with your Firebase web app con
 ---
 
 ## License
-
-MIT — see [LICENSE](LICENSE).
 
 ---
 
