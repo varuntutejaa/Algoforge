@@ -261,6 +261,8 @@
       const data = await response.json();
 
       if (data.success) {
+        // Store the ID token for subsequent API calls
+        localStorage.setItem("algoforge-id-token", idToken);
         markAuthenticated(data.user);
         window.location.href = "problems.html";
       } else {
@@ -323,6 +325,7 @@
           });
           const data = await response.json();
           if (data.success) {
+            localStorage.setItem("algoforge-id-token", idToken);
             markAuthenticated(data.user);
             window.location.href = 'problems.html';
           }

@@ -1,3 +1,8 @@
+// Initialize Firebase
+if (!firebase.apps.length && window.algoforgeFirebaseConfig) {
+    firebase.initializeApp(window.algoforgeFirebaseConfig);
+}
+
 const signupForm = document.getElementById("signupForm");
 
 signupForm.addEventListener("submit", async (e) => {
@@ -39,8 +44,9 @@ signupForm.addEventListener("submit", async (e) => {
         const data = await response.json();
 
         if (data.success) {
-            // Store user info in localStorage
+            // Store user info and ID token in localStorage
             localStorage.setItem("algoforge-auth", "true");
+            localStorage.setItem("algoforge-id-token", idToken);
             localStorage.setItem("algoforge-user", JSON.stringify({
                 id: data.user.id,
                 firebaseUid: data.user.firebaseUid,

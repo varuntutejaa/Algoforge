@@ -63,9 +63,14 @@
     });
 
     logoutBtn.addEventListener('click', () => {
-      localStorage.removeItem('algoforge-auth');
-      localStorage.removeItem('algoforge-user');
-      window.location.href = 'index.html';
+      if (window.algoforgeSignOut) {
+        window.algoforgeSignOut();
+      } else {
+        localStorage.removeItem('algoforge-auth');
+        localStorage.removeItem('algoforge-user');
+        localStorage.removeItem('algoforge-id-token');
+        window.location.href = 'index.html';
+      }
     });
   }
 
@@ -86,20 +91,80 @@
 
   window.getAlgoforgeUser = getStoredUser;
 
-  window.getAuthHeaders = function getAuthHeaders(extraHeaders = {}) {
-    const user = getStoredUser();
-    const headers = { ...extraHeaders };
-    const userId = user?.id || user?.uid;
-
-    if (userId) {
-      headers['x-user-id'] = userId;
+  // Initialize Firebase if not already done (needed for token refresh)
+  function initFirebaseIfNeeded() {
+    if (typeof firebase !== 'undefined' && !firebase.apps.length && window.algoforgeFirebaseConfig) {
+      firebase.initializeApp(window.algoforgeFirebaseConfig);
     }
+  }
 
+  // Get a fresh Firebase ID token (async)
+  async function getFirebaseIdToken() {
+    try {
+      initFirebaseIfNeeded();
+      if (typeof firebase === 'undefined' || !firebase.auth || !firebase.auth().currentUser) {
+        return null;
+      }
+      const token = await firebase.auth().currentUser.getIdToken(true);
+      // Cache the token
+      localStorage.setItem('algoforge-id-token', token);
+      return token;
+    } catch (e) {
+      console.warn('Failed to get Firebase ID token:', e);
+      return null;
+    }
+  }
+
+  window.getAuthHeaders = function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    // Use cached Firebase ID token if available
+    const idToken = localStorage.getItem('algoforge-id-token');
+    if (idToken) {
+      headers['Authorization'] = `Bearer ${idToken}`;
+    }
+    return headers;
+  };
+
+  // Async version for cases where a fresh token is needed
+  window.getAuthHeadersAsync = async function getAuthHeadersAsync(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const token = await getFirebaseIdToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     return headers;
   };
 
   window.getAlgoforgeUserId = function getAlgoforgeUserId() {
     const user = getStoredUser();
     return user?.id || user?.uid || null;
+  };
+
+  // Refresh Firebase ID token periodically (every 50 minutes)
+  setInterval(async () => {
+    if (localStorage.getItem('algoforge-auth') === 'true') {
+      await getFirebaseIdToken();
+    }
+  }, 50 * 60 * 1000);
+
+  // Refresh token on page load if user is logged in
+  if (localStorage.getItem('algoforge-auth') === 'true') {
+    getFirebaseIdToken();
+  }
+
+  // Sign out helper
+  window.algoforgeSignOut = async function algoforgeSignOut() {
+    try {
+      initFirebaseIfNeeded();
+      if (typeof firebase !== 'undefined' && firebase.auth) {
+        await firebase.auth().signOut();
+      }
+    } catch (e) {
+      // ignore
+    }
+    localStorage.removeItem('algoforge-auth');
+    localStorage.removeItem('algoforge-user');
+    localStorage.removeItem('algoforge-id-token');
+    window.location.href = 'index.html';
   };
 })();
