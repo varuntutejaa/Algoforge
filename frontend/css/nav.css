@@ -44,17 +44,11 @@
 }
 
 .brand-icon{
-  width: 64px;
-  height: 64px;
+  width: 30px;
+  height: 30px;
   display: block;
   object-fit: contain;
-  vertical-align: middle;
-}
-
-.brand-text{
-  display: inline-block;
-  line-height: 1;
-  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .brand-text{

@@ -26,7 +26,6 @@ router.get("/", async (req, res) => {
     }
 
     const contests = await Contest.find(filter)
-      .select('-participants')
       .sort({ startsAt: -1 })
       .lean();
 
@@ -69,7 +68,6 @@ router.get("/available", async (req, res) => {
     }
 
     const contests = await Contest.find(filter)
-      .select('-participants')
       .sort({ startsAt: 1 })
       .lean();
 

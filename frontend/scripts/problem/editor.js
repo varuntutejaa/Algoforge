@@ -60,6 +60,18 @@ function canPersistCode() {
   return Boolean(getCurrentUser()?.id && problem?.id);
 }
 
+function localCodeKey(language) {
+  return `af-code-${problemId}-${language}`;
+}
+
+function saveCodeLocally(code, language) {
+  try { localStorage.setItem(localCodeKey(language), code); } catch (_) {}
+}
+
+function loadCodeLocally(language) {
+  try { return localStorage.getItem(localCodeKey(language)) || null; } catch (_) { return null; }
+}
+
 function getBoilerplate(language) {
   if (!problem) return '';
   return problem.boilerplate[language] || problem.boilerplate.cpp || '';
@@ -94,24 +106,30 @@ async function loadSolvedStatus() {
 }
 
 async function fetchSavedCode(language) {
-  if (!canPersistCode()) return null;
+  const local = loadCodeLocally(language);
 
-  try {
-    const response = await fetch(
+  if (canPersistCode()) {
+    // Fetch from server in background; update editor if user hasn't started typing
+    fetch(
       `${API_BASE_URL}/code/${encodeURIComponent(problem.id)}/${encodeURIComponent(language)}`,
       { headers: getAuthHeaders() }
-    );
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    const data = await response.json();
-    return response.ok && data.success ? data.sourceCode : null;
-  } catch (error) {
-    console.log(error);
-    return null;
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.success && data.sourceCode && monacoEditor && !hasUnsavedChanges) {
+          const current = monacoEditor.getValue();
+          if (data.sourceCode !== current) {
+            monacoEditor.setValue(data.sourceCode);
+            lastSavedContent = data.sourceCode;
+            hasUnsavedChanges = false;
+            saveCodeLocally(data.sourceCode, language);
+          }
+        }
+      })
+      .catch(() => {});
   }
+
+  return local;
 }
 
 async function saveCode({ keepalive = false } = {}) {
@@ -150,6 +168,7 @@ async function saveCode({ keepalive = false } = {}) {
 
     lastSavedContent = sourceCode;
     hasUnsavedChanges = false;
+    saveCodeLocally(sourceCode, languageSelect.value);
     if (!keepalive) showToast('Code saved', 'success', 2000);
     return true;
   } catch (error) {
@@ -363,9 +382,14 @@ async function initMonaco() {
   lastSavedContent = initialValue;
   hasUnsavedChanges = false;
 
+  let localSaveTimer = null;
   monacoEditor.onDidChangeModelContent(() => {
     if (isSwitchingLanguage) return;
-    hasUnsavedChanges = monacoEditor.getValue() !== lastSavedContent;
+    const code = monacoEditor.getValue();
+    hasUnsavedChanges = code !== lastSavedContent;
+    // Persist to localStorage on every edit (debounced 400ms)
+    clearTimeout(localSaveTimer);
+    localSaveTimer = setTimeout(() => saveCodeLocally(code, languageSelect.value), 400);
   });
 
   languageSelect.addEventListener('change', async () => {
@@ -378,6 +402,7 @@ async function initMonaco() {
     languageSelect.disabled = true;
 
     const currentCode = monacoEditor.getValue();
+    saveCodeLocally(currentCode, previousLanguage);
     if (canPersistCode() && currentCode !== lastSavedContent) {
       const user = getCurrentUser();
       await fetch(`${API_BASE_URL}/code/save`, {
@@ -459,9 +484,11 @@ if (resetBtn) {
 }
 
 window.addEventListener('beforeunload', () => {
-  if (!hasUnsavedChanges || !canPersistCode() || !monacoEditor || !languageSelect) {
-    return;
-  }
+  if (!monacoEditor || !languageSelect) return;
+  // Always save to localStorage on page leave — no network needed
+  saveCodeLocally(monacoEditor.getValue(), languageSelect.value);
+
+  if (!hasUnsavedChanges || !canPersistCode()) return;
 
   const user = getCurrentUser();
 

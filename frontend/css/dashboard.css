@@ -182,29 +182,29 @@ body{
   padding-bottom: 8px;
 }
 
-.heatmap-months{
-  position: relative;
-  height: 20px;
+.heatmap-flex{
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
   width: max-content;
   min-width: 100%;
-  margin-bottom: 6px;
 }
 
-.heatmap-months span{
-  position: absolute;
+.hm-week{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hm-month-label{
+  height: 16px;
   font-size: 11px;
   color: #64748b;
   font-weight: 600;
   white-space: nowrap;
   font-family: 'DM Mono', monospace;
-}
-
-.heatmap-grid{
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, 14px);
-  gap: 4px;
-  width: max-content;
+  line-height: 16px;
 }
 
 .heat-cell{
@@ -212,6 +212,12 @@ body{
   height: 14px;
   border-radius: 3px;
   background: rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.heat-empty{
+  background: transparent !important;
+  pointer-events: none;
 }
 
 .heat-cell.level-1{ background: rgba(34,197,94,0.35); }

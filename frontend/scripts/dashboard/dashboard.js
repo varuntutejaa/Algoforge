@@ -112,44 +112,58 @@ function getHeatLevel(count) {
 
 function renderHeatmap(activity) {
   const activityMap = new Map(activity.map((entry) => [entry.date, entry.count]));
-  const days = 365;
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (days - 1));
-
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const CELL = 18; // 14px cell + 4px gap
-  const startDow = start.getDay(); // 0=Sun, offset for first partial week
+  const days = 365;
 
-  const cells = [];
-  const monthLabels = [];
+  const end = new Date(); end.setHours(0, 0, 0, 0);
+  const start = new Date(end); start.setDate(start.getDate() - (days - 1));
+  const startDow = start.getDay();
+
+  // Build week columns with month-gap and label metadata
+  const weeks = [];
+  let weekCells = new Array(startDow).fill(null); // empty padding for first partial week
+  let weekLabel = null;
+  let weekIsMonthStart = false;
   let lastMonth = -1;
 
   for (let i = 0; i < days; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     const month = date.getMonth();
-    const col = Math.floor((i + startDow) / 7);
+    const dow = (i + startDow) % 7;
+
+    if (dow === 0 && i > 0) {
+      weeks.push({ cells: weekCells, label: weekLabel, gap: weekIsMonthStart });
+      weekCells = [];
+      weekLabel = null;
+      weekIsMonthStart = false;
+    }
 
     if (month !== lastMonth) {
-      monthLabels.push({ col, label: MONTH_NAMES[month] });
       lastMonth = month;
+      weekLabel = MONTH_NAMES[month];
+      weekIsMonthStart = i > 0; // first month has no gap
     }
 
     const key = date.toISOString().slice(0, 10);
     const count = activityMap.get(key) || 0;
-    cells.push(`<div class="heat-cell level-${getHeatLevel(count)}" title="${key}: ${count} accepted"></div>`);
+    weekCells.push({ key, count });
   }
 
-  const monthsHtml = monthLabels.map(({ col, label }) =>
-    `<span style="left:${col * CELL}px">${label}</span>`
-  ).join('');
+  while (weekCells.length < 7) weekCells.push(null);
+  weeks.push({ cells: weekCells, label: weekLabel, gap: weekIsMonthStart });
 
-  heatmap.innerHTML = `
-    <div class="heatmap-months">${monthsHtml}</div>
-    <div class="heatmap-grid">${cells.join('')}</div>
-  `;
+  const weeksHtml = weeks.map(({ cells, label, gap }) => {
+    const gapStyle = gap ? ' style="margin-left:6px"' : '';
+    const labelHtml = `<div class="hm-month-label">${label || ''}</div>`;
+    const cellsHtml = cells.map((cell) => {
+      if (!cell) return `<div class="heat-cell heat-empty"></div>`;
+      return `<div class="heat-cell level-${getHeatLevel(cell.count)}" title="${cell.key}: ${cell.count} accepted"></div>`;
+    }).join('');
+    return `<div class="hm-week"${gapStyle}>${labelHtml}${cellsHtml}</div>`;
+  }).join('');
+
+  heatmap.innerHTML = `<div class="heatmap-flex">${weeksHtml}</div>`;
 }
 
 function renderRecentActivity(solved) {
