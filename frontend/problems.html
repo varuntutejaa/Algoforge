@@ -10,10 +10,8 @@
   <link rel="icon" href="./assets/favicon-192.png" sizes="192x192" type="image/png">
   <link rel="icon" href="./assets/favicon-512.png" sizes="512x512" type="image/png">
   <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
-  <link rel="mask-icon" href="./assets/algoforge_favicon_themed.svg" color="#0f172a">
-  <meta name="theme-color" content="#050505">
   <link rel="stylesheet" href="./css/nav.css">
-  <link rel="stylesheet" href="./css/problems.css?v=3">
+  <link rel="stylesheet" href="./css/problems.css?v=4">
 </head>
 <body>
   <nav class="app-navbar">
@@ -26,30 +24,49 @@
   </nav>
 
   <main class="problems-page">
-    <header class="problems-header">
-      <span class="section-kicker">Practice Arena</span>
-      <h1>Problems List</h1>
-      <p>Select a challenge and open the code editor with starter boilerplate for C, C++, Java, and JavaScript.</p>
-    </header>
 
-    <div class="problems-filters">
-      <input type="text" id="searchInput" placeholder="Search problems by title or tag..." class="search-input">
-      <div class="filter-row">
-        <div class="difficulty-filters" id="difficultyFilters">
-          <button class="filter-btn active" data-difficulty="all">All</button>
-          <button class="filter-btn easy" data-difficulty="easy">Easy</button>
-          <button class="filter-btn medium" data-difficulty="medium">Medium</button>
-          <button class="filter-btn hard" data-difficulty="hard">Hard</button>
-        </div>
-        <div class="tag-filters" id="tagFilters">
-          <button class="tag-btn active" data-tag="all">All Tags</button>
-        </div>
-      </div>
-      <div class="results-count" id="resultsCount"></div>
+    <!-- Daily Challenge -->
+    <div class="daily-card" id="dailyCard">
+      <div class="daily-loading">Loading today's challenge…</div>
     </div>
 
-    <section class="problems-list" id="problemsList">
-    </section>
+    <!-- Panel -->
+    <div class="problems-panel">
+
+      <!-- Search + filters -->
+      <div class="panel-filters">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="#64748b" stroke-width="1.6"/><path d="M13 13l3.5 3.5" stroke="#64748b" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="text" id="searchInput" placeholder="Search by title or topic…" class="search-input" autocomplete="off" spellcheck="false">
+          <button class="search-clear" id="searchClear" aria-label="Clear search">✕</button>
+        </div>
+        <div class="filter-row">
+          <div class="diff-group" id="difficultyFilters">
+            <button class="diff-btn active" data-difficulty="all">All</button>
+            <button class="diff-btn easy"   data-difficulty="easy">Easy</button>
+            <button class="diff-btn medium" data-difficulty="medium">Medium</button>
+            <button class="diff-btn hard"   data-difficulty="hard">Hard</button>
+          </div>
+          <div class="tag-scroll" id="tagFilters">
+            <button class="tag-btn active" data-tag="all">All Topics</button>
+          </div>
+        </div>
+        <div class="results-meta" id="resultsMeta"></div>
+      </div>
+
+      <!-- Table header -->
+      <div class="prob-table-head">
+        <span class="col-status"></span>
+        <span class="col-num">#</span>
+        <span class="col-title">Title</span>
+        <span class="col-tags">Topics</span>
+        <span class="col-diff">Difficulty</span>
+      </div>
+
+      <!-- Rows -->
+      <div class="prob-table-body" id="problemsList"></div>
+
+    </div>
   </main>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -58,6 +75,6 @@
   <script src="./scripts/config.js"></script>
   <script src="./scripts/design/toast.js"></script>
   <script src="./scripts/design/nav.js?v=3"></script>
-  <script src="./scripts/problem/problems.js?v=3"></script>
+  <script src="./scripts/problem/problems.js?v=4"></script>
 </body>
 </html>
