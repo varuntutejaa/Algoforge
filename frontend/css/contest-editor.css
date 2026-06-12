@@ -477,8 +477,8 @@ body {
 
 .leaderboard-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
   padding: 8px 12px;
   border-radius: 8px;
   margin-bottom: 4px;

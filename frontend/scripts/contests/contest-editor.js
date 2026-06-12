@@ -162,19 +162,42 @@ async function loadContest() {
     contest = data.contest;
     if (arenaTitle) arenaTitle.textContent = contest.title;
 
-    // Load participant progress for current user so solved problems persist across refresh
+    // Find current user's participant entry, auto-joining if not yet a member
     try {
       const user = getCurrentUser();
       let participant = null;
       if (user && contest.participants && Array.isArray(contest.participants)) {
         participant = contest.participants.find((p) => {
-          // match by firebaseUid (most reliable)
           if (user.uid && p.firebaseUid && p.firebaseUid === user.uid) return true;
-          if (user.id && p.firebaseUid && p.firebaseUid === user.id) return true;
-          // fallback: match by name or email
+          if (user.id  && p.firebaseUid && p.firebaseUid === user.id)  return true;
           if (p.name && (p.name === user.name || p.name === user.email)) return true;
           return false;
         });
+      }
+
+      // Auto-join: if the user reached the editor directly (e.g. shared link)
+      // without going through the join flow, join them now so submits work
+      if (!participant && user) {
+        try {
+          const joinRes = await fetch(`${API_BASE_URL}/api/contests/join`, {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ code: contestCode })
+          });
+          const joinData = await joinRes.json();
+          if (joinData.success && joinData.contest?.participants) {
+            // Refresh contest object with up-to-date participants
+            contest = { ...contest, ...joinData.contest };
+            participant = (joinData.contest.participants || []).find((p) => {
+              if (user.uid && p.firebaseUid && p.firebaseUid === user.uid) return true;
+              if (user.id  && p.firebaseUid && p.firebaseUid === user.id)  return true;
+              if (p.name && (p.name === user.name || p.name === user.email)) return true;
+              return false;
+            });
+          }
+        } catch (joinErr) {
+          console.warn('[contest] auto-join failed:', joinErr);
+        }
       }
 
       if (participant) {
@@ -719,7 +742,7 @@ resultsOverlay.addEventListener('click', (e) => {
 
 // --- Leaderboard ---
 async function loadLeaderboard() {
-  if (!contestCode) return;
+  if (!contestCode || !leaderboardList) return;
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/contests/${contestCode}/leaderboard`, {
@@ -727,39 +750,48 @@ async function loadLeaderboard() {
     });
     const data = await res.json();
 
-    if (!data.success) return;
+    if (!data.success) {
+      console.warn('[leaderboard] API error:', data.message);
+      return;
+    }
+
+    const entries = data.leaderboard || [];
+
+    if (entries.length === 0) {
+      leaderboardList.innerHTML = `<div style="padding:16px 12px;color:#475569;font-size:12px">No participants yet.</div>`;
+      return;
+    }
 
     const user = getCurrentUser();
     const contestProblems = contest?.problems || [];
 
-    leaderboardList.innerHTML = data.leaderboard.map((entry) => {
+    leaderboardList.innerHTML = entries.map((entry) => {
       const isSelf = (user?.uid && entry.firebaseUid && entry.firebaseUid === user.uid)
-        || (user?.id && entry.firebaseUid && entry.firebaseUid === user.id)
+        || (user?.id  && entry.firebaseUid && entry.firebaseUid === user.id)
         || entry.name === user?.name
         || entry.name === user?.email;
       const rankClass = entry.rank <= 3 ? `top-${entry.rank}` : '';
       const solvedSet = new Set(entry.solvedProblems || []);
-      const scoreStr = entry.score > 0 ? `+${entry.score}` : `${entry.score}`;
+      const scoreStr = entry.score > 0 ? `+${entry.score}` : String(entry.score);
 
-      // per-problem dots: green ● = solved, gray ○ = unsolved
       const dots = contestProblems.map((p, i) => {
         const solved = solvedSet.has(p.problemId);
-        const t = entry.perProblemTimes?.[p.problemId];
+        const t = (entry.perProblemTimes || {})[p.problemId];
         const label = `P${i + 1}${t != null ? ' ' + formatDuration(t) : ''}`;
-        return `<span class="lb-dot ${solved ? 'solved' : ''}" title="${label}">●</span>`;
+        return `<span class="lb-dot ${solved ? 'solved' : ''}" title="${escapeHtml(label)}">●</span>`;
       }).join('');
 
       const penaltyStr = entry.penalty < 0
-        ? `<span class="lb-penalty">${entry.penalty} pen</span>` : '';
+        ? `<span class="lb-penalty">${entry.penalty}</span>` : '';
       const timeStr = entry.timeTakenSeconds != null
         ? `<span class="lb-time">${formatDuration(entry.timeTakenSeconds)}</span>` : '';
 
       return `
-        <div class="leaderboard-item ${isSelf ? 'self' : ''}">
+        <div class="leaderboard-item${isSelf ? ' self' : ''}">
           <div class="lb-top-row">
             <span class="leaderboard-rank ${rankClass}">${entry.rank}</span>
             <span class="leaderboard-name">${escapeHtml(entry.name)}</span>
-            <span class="lb-score">${scoreStr}</span>
+            <span class="lb-score">${escapeHtml(scoreStr)}</span>
           </div>
           <div class="lb-bottom-row">
             <span class="lb-dots">${dots}</span>
@@ -769,8 +801,8 @@ async function loadLeaderboard() {
         </div>
       `;
     }).join('');
-  } catch {
-    // silent
+  } catch (err) {
+    console.error('[leaderboard] render error:', err);
   }
 }
 
