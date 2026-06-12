@@ -164,9 +164,9 @@ async function loadContest() {
       let participant = null;
       if (user && contest.participants && Array.isArray(contest.participants)) {
         participant = contest.participants.find((p) => {
-          // match by stored userId if available
-          if (user.id && p.userId && String(p.userId) === String(user.id)) return true;
-          if (user.uid && p.userId && String(p.userId) === String(user.uid)) return true;
+          // match by firebaseUid (most reliable)
+          if (user.uid && p.firebaseUid && p.firebaseUid === user.uid) return true;
+          if (user.id && p.firebaseUid && p.firebaseUid === user.id) return true;
           // fallback: match by name or email
           if (p.name && (p.name === user.name || p.name === user.email)) return true;
           return false;
@@ -174,14 +174,11 @@ async function loadContest() {
       }
 
       if (participant) {
-        // restore solved problems
         solvedProblems = new Set(participant.solvedProblems || []);
 
-        // if participant already finished, disable actions
         if (participant.finishedAt) {
           if (runBtn) runBtn.disabled = true;
           if (submitBtn) submitBtn.disabled = true;
-          // show finished state on timer
           if (arenaTimer) {
             arenaTimer.textContent = 'Finished';
             if (arenaTimer.classList) arenaTimer.classList.add('urgent');
@@ -189,7 +186,7 @@ async function loadContest() {
         }
       }
     } catch (e) {
-      // ignore participant restore errors
+      console.warn('[contest] participant restore error:', e);
     }
 
     // Check if contest is active
@@ -470,11 +467,11 @@ async function switchProblem(index) {
   currentProblemIndex = index;
   renderProblemList();
   await loadProblemDetails(index);
-  // Reset editor content to boilerplate for this problem
   if (monacoEditor && currentProblemData) {
     const lang = languageSelect.value;
-    const boilerplate = currentProblemData.boilerplate[lang] || currentProblemData.boilerplate.cpp || '';
-    monacoEditor.setValue(boilerplate);
+    const saved = loadSavedCode(currentProblemData.id, lang);
+    const code = saved !== null ? saved : (currentProblemData.boilerplate[lang] || currentProblemData.boilerplate.cpp || '');
+    monacoEditor.setValue(code);
   }
 }
 
@@ -530,13 +527,40 @@ async function loadProblemDetails(index) {
   }
 }
 
+// --- Code persistence helpers ---
+function getCodeStorageKey(problemId, lang) {
+  return `contest:${contestCode}:code:${problemId}:${lang}`;
+}
+
+function saveCode(problemId, lang, code) {
+  try {
+    localStorage.setItem(getCodeStorageKey(problemId, lang), code);
+  } catch (e) {}
+}
+
+function loadSavedCode(problemId, lang) {
+  try {
+    return localStorage.getItem(getCodeStorageKey(problemId, lang));
+  } catch (e) { return null; }
+}
+
+let codeSaveTimer = null;
+function scheduleCodeSave() {
+  if (!monacoEditor || !currentProblemData) return;
+  clearTimeout(codeSaveTimer);
+  codeSaveTimer = setTimeout(() => {
+    saveCode(currentProblemData.id, languageSelect.value, monacoEditor.getValue());
+  }, 500);
+}
+
 // --- Monaco editor ---
 function initMonaco() {
   if (!codeEditorContainer) return;
 
   const initialLanguage = languageSelect.value;
   const monacoLang = monacoLanguages[initialLanguage] || 'cpp';
-  const initialValue = currentProblemData?.boilerplate?.[initialLanguage] || currentProblemData?.boilerplate?.cpp || '';
+  const savedCode = currentProblemData ? loadSavedCode(currentProblemData.id, initialLanguage) : null;
+  const initialValue = savedCode !== null ? savedCode : (currentProblemData?.boilerplate?.[initialLanguage] || currentProblemData?.boilerplate?.cpp || '');
 
   require.config({
     paths: {
@@ -559,6 +583,8 @@ function initMonaco() {
       insertSpaces: true,
       padding: { top: 12, bottom: 12 }
     });
+
+    monacoEditor.onDidChangeModelContent(() => scheduleCodeSave());
   });
 
   // Language switch
@@ -569,8 +595,9 @@ function initMonaco() {
     if (model) {
       monaco.editor.setModelLanguage(model, monacoLanguages[lang] || 'cpp');
     }
-    const boilerplate = currentProblemData.boilerplate[lang] || currentProblemData.boilerplate.cpp || '';
-    monacoEditor.setValue(boilerplate);
+    const saved = loadSavedCode(currentProblemData.id, lang);
+    const code = saved !== null ? saved : (currentProblemData.boilerplate[lang] || currentProblemData.boilerplate.cpp || '');
+    monacoEditor.setValue(code);
   });
 }
 
@@ -699,18 +726,25 @@ async function loadLeaderboard() {
     if (!data.success) return;
 
     const user = getCurrentUser();
+    const totalProblems = (contest?.problems || []).length;
 
     leaderboardList.innerHTML = data.leaderboard.map((entry) => {
-      const isSelf = entry.name === user?.name || entry.name === user?.email;
+      const isSelf = (user?.uid && entry.firebaseUid && entry.firebaseUid === user.uid)
+        || (user?.id && entry.firebaseUid && entry.firebaseUid === user.id)
+        || entry.name === user?.name
+        || entry.name === user?.email;
       const rankClass = entry.rank <= 3 ? `top-${entry.rank}` : '';
-      const penaltyStr = entry.penalty < 0 ? `<span class="leaderboard-penalty">${entry.penalty}</span>` : '';
       const solved = (entry.solvedProblems || []).length;
+      const scoreStr = entry.score >= 0 ? `+${entry.score}` : `${entry.score}`;
+      const penaltyStr = entry.penalty < 0
+        ? `<span class="leaderboard-penalty">${entry.penalty}</span>`
+        : '';
       return `
         <div class="leaderboard-item ${isSelf ? 'self' : ''}">
           <span class="leaderboard-rank ${rankClass}">${entry.rank}</span>
           <span class="leaderboard-name ${entry.rank === 1 ? 'top-leader' : ''}">${escapeHtml(entry.name)}</span>
-          <span class="leaderboard-solved">${solved}✓</span>
-          <span class="leaderboard-score">${entry.score}</span>
+          <span class="leaderboard-solved">${solved}/${totalProblems}</span>
+          <span class="leaderboard-score">${scoreStr} pts</span>
           ${penaltyStr}
           <span class="leaderboard-time">${entry.timeTakenSeconds != null ? formatDuration(entry.timeTakenSeconds) : '--'}</span>
         </div>

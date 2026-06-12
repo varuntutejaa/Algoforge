@@ -3,11 +3,12 @@ const mongoose = require("mongoose");
 const contestParticipantSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    firebaseUid: { type: String, default: "" },
     name: { type: String, required: true },
     score: { type: Number, default: 0 },
     solvedProblems: { type: [String], default: [] },
-    penalty: { type: Number, default: 0 },       // cumulative deduction (-10 per wrong attempt)
-    wrongAttempts: { type: Number, default: 0 },  // total wrong submissions
+    penalty: { type: Number, default: 0 },
+    wrongAttempts: { type: Number, default: 0 },
     finishedAt: { type: Date, default: null }
   },
   { _id: false }

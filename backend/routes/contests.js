@@ -119,6 +119,7 @@ router.get("/:code/leaderboard", async (req, res) => {
         } catch (e) { timeTakenSeconds = null; }
         return {
           name: p.name,
+          firebaseUid: p.firebaseUid || "",
           score: Number(p.score) || 0,
           penalty: Number(p.penalty) || 0,
           wrongAttempts: Number(p.wrongAttempts) || 0,
@@ -211,6 +212,7 @@ router.post("/create", verifyFirebaseToken, async (req, res) => {
     // Add creator as participant
     contest.participants.push({
       userId: user._id,
+      firebaseUid: req.firebaseUid || "",
       name: user.name || user.email,
       score: 0,
       solvedProblems: [],
@@ -262,6 +264,7 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
 
     contest.participants.push({
       userId: user._id,
+      firebaseUid: req.firebaseUid || "",
       name: user.name || user.email,
       score: 0,
       solvedProblems: [],
