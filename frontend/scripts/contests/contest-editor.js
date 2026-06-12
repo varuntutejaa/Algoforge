@@ -712,11 +712,27 @@ async function executeCode(action) {
     if (isSubmit) {
       if (passed && verdict === 'Accepted') solvedProblems.add(problemId);
 
-      await fetch(`${API_BASE_URL}/api/contests/${contestCode}/submit`, {
-        method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ problemId, language, sourceCode, verdict })
-      });
+      // Use a fresh Firebase token — a stale cached token silently 401s and the
+      // solve never registers (the #1 cause of "not showing in leaderboard").
+      const submitHeaders = typeof getAuthHeadersAsync === 'function'
+        ? await getAuthHeadersAsync({ 'Content-Type': 'application/json' })
+        : getAuthHeaders({ 'Content-Type': 'application/json' });
+
+      try {
+        const cRes = await fetch(`${API_BASE_URL}/api/contests/${contestCode}/submit`, {
+          method: 'POST',
+          headers: submitHeaders,
+          body: JSON.stringify({ problemId, language, sourceCode, verdict })
+        });
+        const cData = await cRes.json();
+        if (!cData.success) {
+          console.error('[contest] submit not recorded:', cRes.status, cData.message);
+          showToast(cData.message || 'Could not record your submission. Try again.', 'error');
+        }
+      } catch (subErr) {
+        console.error('[contest] submit request failed:', subErr);
+        showToast('Could not reach the contest server to record your result.', 'error');
+      }
 
       renderProblemList();
       loadLeaderboard();

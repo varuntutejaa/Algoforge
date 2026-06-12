@@ -267,12 +267,17 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
     }
 
     // Check if already a participant
-    const alreadyJoined = contest.participants.some(
-      (p) => p.userId.toString() === user._id.toString()
+    const existing = contest.participants.find(
+      (p) => p.userId && p.userId.toString() === user._id.toString()
     );
 
-    if (alreadyJoined) {
-      return res.json({ success: true, contest: formatContest(contest.toObject()) });
+    if (existing) {
+      // Backfill firebaseUid if it was empty (older join) so refresh-matching works
+      if (!existing.firebaseUid && req.firebaseUid) {
+        existing.firebaseUid = req.firebaseUid;
+        await contest.save();
+      }
+      return res.json({ success: true, contest: formatContestDetail(contest.toObject()) });
     }
 
     contest.participants.push({
@@ -316,12 +321,28 @@ router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "Contest is not active" });
     }
 
-    const participant = contest.participants.find(
-      (p) => p.userId.toString() === user._id.toString()
+    let participant = contest.participants.find(
+      (p) => p.userId && p.userId.toString() === user._id.toString()
     );
 
+    // Self-heal: if the user submits but isn't registered yet (join failed,
+    // direct URL, expired token at join time), register them now so their
+    // solve is always recorded and they appear on the leaderboard.
     if (!participant) {
-      return res.status(403).json({ success: false, message: "You are not a participant in this contest" });
+      contest.participants.push({
+        userId: user._id,
+        firebaseUid: req.firebaseUid || "",
+        name: user.name || user.email,
+        score: 0,
+        solvedProblems: [],
+      });
+      participant = contest.participants[contest.participants.length - 1];
+      console.log(`[contests] /submit auto-registered user=${user._id} in code=${code}`);
+    }
+
+    // Backfill firebaseUid for participants joined before this field existed
+    if (!participant.firebaseUid && req.firebaseUid) {
+      participant.firebaseUid = req.firebaseUid;
     }
 
     const alreadySolved = participant.solvedProblems.includes(problemId);
