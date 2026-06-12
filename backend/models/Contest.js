@@ -7,6 +7,7 @@ const contestParticipantSchema = new mongoose.Schema(
     name: { type: String, required: true },
     score: { type: Number, default: 0 },
     solvedProblems: { type: [String], default: [] },
+    solveTimestamps: { type: [{ problemId: String, solvedAt: Date }], default: [] },
     penalty: { type: Number, default: 0 },
     wrongAttempts: { type: Number, default: 0 },
     finishedAt: { type: Date, default: null }

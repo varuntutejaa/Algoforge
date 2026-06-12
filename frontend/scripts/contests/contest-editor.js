@@ -106,6 +106,10 @@ function updateTimer() {
     clearInterval(timerInterval);
     if (runBtn) runBtn.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
+    // Redirect to results after a short delay so user sees the 00:00 state
+    setTimeout(() => {
+      window.location.href = `contest-results.html?code=${encodeURIComponent(contestCode)}`;
+    }, 2500);
     return;
   }
 
@@ -726,7 +730,7 @@ async function loadLeaderboard() {
     if (!data.success) return;
 
     const user = getCurrentUser();
-    const totalProblems = (contest?.problems || []).length;
+    const contestProblems = contest?.problems || [];
 
     leaderboardList.innerHTML = data.leaderboard.map((entry) => {
       const isSelf = (user?.uid && entry.firebaseUid && entry.firebaseUid === user.uid)
@@ -734,19 +738,34 @@ async function loadLeaderboard() {
         || entry.name === user?.name
         || entry.name === user?.email;
       const rankClass = entry.rank <= 3 ? `top-${entry.rank}` : '';
-      const solved = (entry.solvedProblems || []).length;
-      const scoreStr = entry.score >= 0 ? `+${entry.score}` : `${entry.score}`;
+      const solvedSet = new Set(entry.solvedProblems || []);
+      const scoreStr = entry.score > 0 ? `+${entry.score}` : `${entry.score}`;
+
+      // per-problem dots: green ● = solved, gray ○ = unsolved
+      const dots = contestProblems.map((p, i) => {
+        const solved = solvedSet.has(p.problemId);
+        const t = entry.perProblemTimes?.[p.problemId];
+        const label = `P${i + 1}${t != null ? ' ' + formatDuration(t) : ''}`;
+        return `<span class="lb-dot ${solved ? 'solved' : ''}" title="${label}">●</span>`;
+      }).join('');
+
       const penaltyStr = entry.penalty < 0
-        ? `<span class="leaderboard-penalty">${entry.penalty}</span>`
-        : '';
+        ? `<span class="lb-penalty">${entry.penalty} pen</span>` : '';
+      const timeStr = entry.timeTakenSeconds != null
+        ? `<span class="lb-time">${formatDuration(entry.timeTakenSeconds)}</span>` : '';
+
       return `
         <div class="leaderboard-item ${isSelf ? 'self' : ''}">
-          <span class="leaderboard-rank ${rankClass}">${entry.rank}</span>
-          <span class="leaderboard-name ${entry.rank === 1 ? 'top-leader' : ''}">${escapeHtml(entry.name)}</span>
-          <span class="leaderboard-solved">${solved}/${totalProblems}</span>
-          <span class="leaderboard-score">${scoreStr} pts</span>
-          ${penaltyStr}
-          <span class="leaderboard-time">${entry.timeTakenSeconds != null ? formatDuration(entry.timeTakenSeconds) : '--'}</span>
+          <div class="lb-top-row">
+            <span class="leaderboard-rank ${rankClass}">${entry.rank}</span>
+            <span class="leaderboard-name">${escapeHtml(entry.name)}</span>
+            <span class="lb-score">${scoreStr}</span>
+          </div>
+          <div class="lb-bottom-row">
+            <span class="lb-dots">${dots}</span>
+            ${penaltyStr}
+            ${timeStr}
+          </div>
         </div>
       `;
     }).join('');

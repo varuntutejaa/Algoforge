@@ -117,6 +117,18 @@ router.get("/:code/leaderboard", async (req, res) => {
             timeTakenSeconds = Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000));
           }
         } catch (e) { timeTakenSeconds = null; }
+        // per-problem solve times in seconds relative to contest start
+        const perProblem = {};
+        (p.solveTimestamps || []).forEach((st) => {
+          try {
+            if (st.problemId && st.solvedAt && contest.startsAt) {
+              perProblem[st.problemId] = Math.max(0, Math.floor(
+                (new Date(st.solvedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000
+              ));
+            }
+          } catch (e) {}
+        });
+
         return {
           name: p.name,
           firebaseUid: p.firebaseUid || "",
@@ -124,6 +136,7 @@ router.get("/:code/leaderboard", async (req, res) => {
           penalty: Number(p.penalty) || 0,
           wrongAttempts: Number(p.wrongAttempts) || 0,
           solvedProblems: p.solvedProblems || [],
+          perProblemTimes: perProblem,
           finishedAt,
           timeTakenSeconds
         };
@@ -315,13 +328,13 @@ router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
 
     if (!alreadySolved) {
       if (verdict === "Accepted") {
-        // +100 per solved problem
         if (!Array.isArray(participant.solvedProblems)) participant.solvedProblems = [];
         participant.solvedProblems.push(problemId);
+        if (!Array.isArray(participant.solveTimestamps)) participant.solveTimestamps = [];
+        participant.solveTimestamps.push({ problemId, solvedAt: new Date() });
         if (typeof participant.score !== 'number' || Number.isNaN(participant.score)) participant.score = 0;
         participant.score = Number(participant.score) + 100;
       } else {
-        // -10 per wrong attempt on unsolved problem
         participant.score = (Number(participant.score) || 0) - 10;
         participant.penalty = (Number(participant.penalty) || 0) - 10;
         participant.wrongAttempts = (Number(participant.wrongAttempts) || 0) + 1;

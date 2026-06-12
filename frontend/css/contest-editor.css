@@ -549,6 +549,60 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Redesigned live leaderboard rows */
+.lb-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.lb-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 32px;
+}
+
+.lb-score {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.lb-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.lb-dot {
+  font-size: 10px;
+  color: #334155;
+  cursor: default;
+}
+
+.lb-dot.solved {
+  color: #22c55e;
+}
+
+.lb-penalty {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.lb-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
 /* Results panel */
 .results-overlay {
   position: fixed;
