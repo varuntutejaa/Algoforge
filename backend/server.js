@@ -19,7 +19,9 @@ const contestRoutes = require('./routes/contests');
 const { verifyFirebaseToken, optionalAuth } = require('./middleware/auth');
 
 require("dotenv").config();
+const compression = require("compression");
 const app = express();
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 
@@ -1061,7 +1063,10 @@ app.get("/code/:problemId/:language", verifyFirebaseToken, async (req, res) => {
 // Get all problems
 app.get("/problems", async (req, res) => {
     try {
-        const problems = await Problem.find().sort({ createdAt: 1 }).lean();
+        const problems = await Problem.find()
+            .select('id title difficulty tags description testCases')
+            .sort({ createdAt: 1 })
+            .lean();
 
         res.json({
             success: true,

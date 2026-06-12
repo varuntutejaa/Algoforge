@@ -26,37 +26,25 @@ router.get("/", async (req, res) => {
     }
 
     const contests = await Contest.find(filter)
+      .select('-participants')
       .sort({ startsAt: -1 })
       .lean();
 
     const now = new Date();
 
-    // Auto-update status based on time
+    // Auto-update status in-memory and fire-and-forget bulkWrite — no re-fetch
     const bulkOps = [];
     for (const contest of contests) {
       if (contest.status === "upcoming" && now >= contest.startsAt && now < contest.endsAt) {
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: contest._id, status: "upcoming" },
-            update: { $set: { status: "active" } }
-          }
-        });
+        contest.status = "active";
+        bulkOps.push({ updateOne: { filter: { _id: contest._id, status: "upcoming" }, update: { $set: { status: "active" } } } });
       } else if (contest.status !== "ended" && now >= contest.endsAt) {
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: contest._id, status: { $ne: "ended" } },
-            update: { $set: { status: "ended" } }
-          }
-        });
+        contest.status = "ended";
+        bulkOps.push({ updateOne: { filter: { _id: contest._id, status: { $ne: "ended" } }, update: { $set: { status: "ended" } } } });
       }
     }
 
-    if (bulkOps.length) {
-      await Contest.bulkWrite(bulkOps);
-      // Re-fetch with updated statuses
-      const updated = await Contest.find(filter).sort({ startsAt: -1 }).lean();
-      return res.json({ success: true, contests: updated.map(formatContest) });
-    }
+    if (bulkOps.length) Contest.bulkWrite(bulkOps).catch(console.error);
 
     res.json({ success: true, contests: contests.map(formatContest) });
   } catch (error) {
@@ -81,6 +69,7 @@ router.get("/available", async (req, res) => {
     }
 
     const contests = await Contest.find(filter)
+      .select('-participants')
       .sort({ startsAt: 1 })
       .lean();
 

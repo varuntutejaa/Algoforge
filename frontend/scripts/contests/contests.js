@@ -108,6 +108,8 @@ async function fetchProblems() {
   }
 }
 
+let createFormReady = false;
+
 // --- Tabs ---
 tabs.forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -118,6 +120,11 @@ tabs.forEach((btn) => {
     });
     // Show/hide search based on tab
     contestsSearch.style.display = (btn.dataset.tab === 'my' || btn.dataset.tab === 'join') ? 'block' : 'none';
+    // Lazy-load problems only when Create tab is first opened
+    if (btn.dataset.tab === 'create' && !createFormReady) {
+      createFormReady = true;
+      initCreateForm();
+    }
   });
 });
 
@@ -665,10 +672,8 @@ joinCode.addEventListener('keydown', (e) => {
 
 // --- Init ---
 (async function init() {
-  await initCreateForm();
-  await loadMyContests();
-  await loadAvailableContests();
   contestsSearch.style.display = 'block';
+  await Promise.all([loadMyContests(), loadAvailableContests()]);
 })();
 
 setInterval(() => {

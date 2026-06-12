@@ -39,5 +39,8 @@ const contestSchema = new mongoose.Schema(
 );
 
 contestSchema.index({ status: 1, startsAt: 1 });
+contestSchema.index({ createdBy: 1, startsAt: -1 });
+contestSchema.index({ "participants.userId": 1 });
+contestSchema.index({ endsAt: 1 });
 
 module.exports = mongoose.model("Contest", contestSchema);
