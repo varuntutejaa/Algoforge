@@ -132,7 +132,7 @@ async function fetchSavedCode(language) {
   return local;
 }
 
-async function saveCode({ keepalive = false } = {}) {
+async function saveCode({ keepalive = false, silent = false } = {}) {
   if (!canPersistCode() || !monacoEditor || !languageSelect) {
     return false;
   }
@@ -169,7 +169,7 @@ async function saveCode({ keepalive = false } = {}) {
     lastSavedContent = sourceCode;
     hasUnsavedChanges = false;
     saveCodeLocally(sourceCode, languageSelect.value);
-    if (!keepalive) showToast('Code saved', 'success', 2000);
+    if (!keepalive && !silent) showToast('Code saved', 'success', 2000);
     return true;
   } catch (error) {
     console.log(error);
@@ -207,7 +207,7 @@ function startAutoSave() {
 
   autoSaveTimer = setInterval(() => {
     if (hasUnsavedChanges) {
-      saveCode();
+      saveCode({ silent: true });
     }
   }, AUTO_SAVE_INTERVAL_MS);
 }
