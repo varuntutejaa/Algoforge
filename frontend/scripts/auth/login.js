@@ -22,7 +22,8 @@
     if (user) {
       localStorage.setItem("algoforge-user", JSON.stringify({
         id: user.id || user.uid || "",
-        uid: user.uid || user.id || "",
+        uid: user.firebaseUid || user.uid || user.id || "",
+        firebaseUid: user.firebaseUid || "",
         name: user.name || user.displayName || "",
         email: user.email || "",
         photoURL: user.photoURL || ""

@@ -48,7 +48,9 @@
         localStorage.setItem('algoforge-auth', 'true');
         localStorage.setItem('algoforge-id-token', idToken);
         localStorage.setItem('algoforge-user', JSON.stringify({
-          id: data.user.id, firebaseUid: data.user.firebaseUid,
+          id: data.user.id,
+          uid: data.user.firebaseUid || "",
+          firebaseUid: data.user.firebaseUid || "",
           name: data.user.name, email: data.user.email
         }));
         showToast('Account created! Redirecting…', 'success');

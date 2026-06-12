@@ -165,35 +165,49 @@ async function loadContest() {
     // Find current user's participant entry, auto-joining if not yet a member
     try {
       const user = getCurrentUser();
-      let participant = null;
-      if (user && contest.participants && Array.isArray(contest.participants)) {
-        participant = contest.participants.find((p) => {
-          if (user.uid && p.firebaseUid && p.firebaseUid === user.uid) return true;
-          if (user.id  && p.firebaseUid && p.firebaseUid === user.id)  return true;
+
+      function findSelf(participants) {
+        if (!user || !Array.isArray(participants)) return null;
+        return participants.find((p) => {
+          // Match by Firebase UID (most reliable — uid field fixed to store Firebase UID)
+          const fuid = user.firebaseUid || user.uid;
+          if (fuid && p.firebaseUid && p.firebaseUid === fuid) return true;
+          // Match by MongoDB userId (serialized as string in JSON)
+          if (user.id && p.userId && p.userId.toString() === user.id) return true;
+          // Fallback: name / email
           if (p.name && (p.name === user.name || p.name === user.email)) return true;
           return false;
         });
       }
 
+      let participant = findSelf(contest.participants);
+
       // Auto-join: if the user reached the editor directly (e.g. shared link)
-      // without going through the join flow, join them now so submits work
+      // without going through the join flow, join them now so submits work.
+      // Use getAuthHeadersAsync to guarantee a fresh, valid Firebase ID token.
       if (!participant && user) {
         try {
+          const authHeaders = typeof getAuthHeadersAsync === 'function'
+            ? await getAuthHeadersAsync({ 'Content-Type': 'application/json' })
+            : getAuthHeaders({ 'Content-Type': 'application/json' });
+
           const joinRes = await fetch(`${API_BASE_URL}/api/contests/join`, {
             method: 'POST',
-            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            headers: authHeaders,
             body: JSON.stringify({ code: contestCode })
           });
           const joinData = await joinRes.json();
-          if (joinData.success && joinData.contest?.participants) {
-            // Refresh contest object with up-to-date participants
-            contest = { ...contest, ...joinData.contest };
-            participant = (joinData.contest.participants || []).find((p) => {
-              if (user.uid && p.firebaseUid && p.firebaseUid === user.uid) return true;
-              if (user.id  && p.firebaseUid && p.firebaseUid === user.id)  return true;
-              if (p.name && (p.name === user.name || p.name === user.email)) return true;
-              return false;
+          console.log('[contest] auto-join response:', joinData.success, joinData.message || '');
+          if (joinData.success) {
+            // alreadyJoined path returns formatContest (no participants); re-fetch full detail
+            const refreshRes = await fetch(`${API_BASE_URL}/api/contests/${contestCode}`, {
+              headers: getAuthHeaders()
             });
+            const refreshData = await refreshRes.json();
+            if (refreshData.success) {
+              contest = refreshData.contest;
+              participant = findSelf(contest.participants);
+            }
           }
         } catch (joinErr) {
           console.warn('[contest] auto-join failed:', joinErr);
@@ -766,8 +780,8 @@ async function loadLeaderboard() {
     const contestProblems = contest?.problems || [];
 
     leaderboardList.innerHTML = entries.map((entry) => {
-      const isSelf = (user?.uid && entry.firebaseUid && entry.firebaseUid === user.uid)
-        || (user?.id  && entry.firebaseUid && entry.firebaseUid === user.id)
+      const fuid = user?.firebaseUid || user?.uid;
+      const isSelf = (fuid && entry.firebaseUid && entry.firebaseUid === fuid)
         || entry.name === user?.name
         || entry.name === user?.email;
       const rankClass = entry.rank <= 3 ? `top-${entry.rank}` : '';
@@ -828,3 +842,54 @@ window.addEventListener('beforeunload', () => {
 
 // --- Start ---
 loadContest();
+
+// If Firebase auth state wasn't ready when loadContest ran, retry auto-join once
+// it confirms a logged-in user. This covers the direct-URL / cold-load case.
+(function retryJoinOnAuth() {
+  try {
+    if (typeof firebase === 'undefined' || !firebase.auth) return;
+    const unsub = firebase.auth().onAuthStateChanged(async (firebaseUser) => {
+      unsub(); // one-shot
+      if (!firebaseUser || !contest) return;
+
+      // Update localStorage user with fresh Firebase UID
+      const stored = typeof getAlgoforgeUser === 'function' ? getAlgoforgeUser() : null;
+      if (stored && !stored.firebaseUid) {
+        stored.firebaseUid = firebaseUser.uid;
+        stored.uid = firebaseUser.uid;
+        try { localStorage.setItem('algoforge-user', JSON.stringify(stored)); } catch (e) {}
+      }
+
+      // Check if user is already in participants; if not, join
+      const participants = contest.participants || [];
+      const alreadyIn = participants.some((p) =>
+        (p.firebaseUid && p.firebaseUid === firebaseUser.uid) ||
+        (stored?.id && p.userId && p.userId.toString() === stored.id) ||
+        (p.name && stored && (p.name === stored.name || p.name === stored.email))
+      );
+      if (alreadyIn) return;
+
+      try {
+        const token = await firebaseUser.getIdToken(true);
+        localStorage.setItem('algoforge-id-token', token);
+        const joinRes = await fetch(`${API_BASE_URL}/api/contests/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ code: contestCode })
+        });
+        const joinData = await joinRes.json();
+        console.log('[contest] auth-ready join:', joinData.success, joinData.message || '');
+        if (joinData.success) {
+          // Refresh contest so participant state is accurate
+          const r = await fetch(`${API_BASE_URL}/api/contests/${contestCode}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const rd = await r.json();
+          if (rd.success) contest = rd.contest;
+        }
+      } catch (e) {
+        console.warn('[contest] auth-ready join failed:', e);
+      }
+    });
+  } catch (e) { /* firebase not available */ }
+}());

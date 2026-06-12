@@ -56,9 +56,9 @@
       const problems = contest.problems || [];
 
       const user = typeof getAlgoforgeUser === 'function' ? getAlgoforgeUser() : null;
+      const fuid = user?.firebaseUid || user?.uid;
       const myEntry = lb.find(e =>
-        (user?.uid && e.firebaseUid && e.firebaseUid === user.uid) ||
-        (user?.id  && e.firebaseUid && e.firebaseUid === user.id)  ||
+        (fuid && e.firebaseUid && e.firebaseUid === fuid) ||
         e.name === user?.name || e.name === user?.email
       );
 
