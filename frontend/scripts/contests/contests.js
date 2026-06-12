@@ -638,13 +638,23 @@ joinBtn.addEventListener('click', async () => {
   if (joinStatus) joinStatus.textContent = '';
 
   try {
+    // Use a fresh Firebase token — a stale cached token silently 401s the join,
+    // so the user never gets registered and never appears on the leaderboard.
+    const authHeaders = typeof getAuthHeadersAsync === 'function'
+      ? await getAuthHeadersAsync({ 'Content-Type': 'application/json' })
+      : getAuthHeaders({ 'Content-Type': 'application/json' });
+
     const res = await fetch(`${API_BASE_URL}/api/contests/join`, {
       method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      headers: authHeaders,
       body: JSON.stringify({ code })
     });
 
     const data = await res.json();
+
+    if (!data.success) {
+      console.error('[contest] join failed:', res.status, data.message);
+    }
 
     if (data.success) {
       showToast(`Joined "${data.contest.title}"!`, 'success');
