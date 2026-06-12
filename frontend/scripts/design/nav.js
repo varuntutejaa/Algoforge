@@ -140,16 +140,57 @@
     return user?.id || user?.uid || null;
   };
 
-  // Refresh Firebase ID token periodically (every 50 minutes)
+  // Hook into Firebase auth state — whenever Firebase silently refreshes a token
+  // (which it does automatically before expiry), we capture it immediately.
+  function startAuthStateListener() {
+    try {
+      initFirebaseIfNeeded();
+      if (typeof firebase === 'undefined' || !firebase.auth) return;
+      firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+          // Firebase just confirmed the user is signed in; grab its current token
+          // (false = use cache if still valid, Firebase refreshes automatically)
+          user.getIdToken(false).then((token) => {
+            localStorage.setItem('algoforge-id-token', token);
+          }).catch(() => {});
+        }
+      });
+      // Also listen for token refresh events (fires whenever Firebase issues a new token)
+      firebase.auth().onIdTokenChanged((user) => {
+        if (user) {
+          user.getIdToken(false).then((token) => {
+            localStorage.setItem('algoforge-id-token', token);
+          }).catch(() => {});
+        }
+      });
+    } catch (e) {}
+  }
+
+  // Refresh when the user returns to the tab after being away
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && localStorage.getItem('algoforge-auth') === 'true') {
+      getFirebaseIdToken();
+    }
+  });
+
+  // Also refresh on window focus (covers switching back from another app)
+  window.addEventListener('focus', () => {
+    if (localStorage.getItem('algoforge-auth') === 'true') {
+      getFirebaseIdToken();
+    }
+  });
+
+  // Periodic safety net — every 15 minutes (well within Firebase's 1-hour expiry)
   setInterval(async () => {
     if (localStorage.getItem('algoforge-auth') === 'true') {
       await getFirebaseIdToken();
     }
-  }, 50 * 60 * 1000);
+  }, 15 * 60 * 1000);
 
   // Refresh token on page load if user is logged in
   if (localStorage.getItem('algoforge-auth') === 'true') {
     getFirebaseIdToken();
+    startAuthStateListener();
   }
 
   // Sign out helper
