@@ -117,7 +117,9 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <!-- Firebase (UMD) must load BEFORE Monaco's AMD loader, otherwise the
+       compat bundles register as anonymous AMD modules and collide with
+       Monaco ("Can only have one anonymous define call per script file"). -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="./scripts/auth/firebase-config.js"></script>
@@ -128,6 +130,8 @@
     // Override initAppNav to not render in this page
     window.initAppNav = function() {};
   </script>
-  <script src="./scripts/contests/contest-editor.js?v=5"></script>
+  <!-- Monaco AMD loader last, so it doesn't intercept the UMD libs above -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <script src="./scripts/contests/contest-editor.js?v=6"></script>
 </body>
 </html>
