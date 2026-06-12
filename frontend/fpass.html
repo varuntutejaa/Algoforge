@@ -1,79 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Forgot Password - AlgoForge</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="./css/signup.css">
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlgoForge — Reset Password</title>
+  <link rel="icon" href="./assets/algoforge_favicon_themed.svg" type="image/svg+xml" sizes="any">
+  <link rel="icon" href="./assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <meta name="theme-color" content="#050505">
+  <link rel="stylesheet" href="./css/nav.css">
+  <link rel="stylesheet" href="./css/login.css" />
 </head>
-
 <body>
 
-  <div class="form-panel">
+  <nav class="app-navbar">
+    <a class="brand" href="index.html">
+      <img src="./assets/algoforge_favicon_themed.svg" alt="AlgoForge" class="brand-icon">
+      <span class="brand-text">AlgoForge</span>
+    </a>
+  </nav>
 
-    <div class="form-card">
+  <main class="page auth-page">
+    <section class="form-panel">
+      <div class="form-card">
 
-      <div class="form-header">
+        <!-- Default: request form -->
+        <div id="resetView">
+          <div class="form-header">
+            <h2 class="form-title">Reset password</h2>
+            <p class="form-sub">Enter your account email and we'll send a reset link.</p>
+          </div>
 
-        <p class="form-eyebrow">
-          // password recovery
-        </p>
+          <form id="forgotForm" class="login-form" novalidate>
+            <div class="field-group" id="emailGroup">
+              <label for="email" class="field-label">Email</label>
+              <div class="field-wrap">
+                <svg class="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                <input type="email" id="email" class="field-input" placeholder="you@example.com" autocomplete="email" required />
+              </div>
+              <p class="field-error" id="emailError"></p>
+            </div>
 
-        <h2 class="form-title">
-          Forgot Password
-        </h2>
+            <button type="submit" class="submit-btn" id="submitBtn">
+              <span class="btn-label">Send Reset Link</span>
+              <span class="btn-loader" id="btnLoader" style="display:none"></span>
+            </button>
+          </form>
 
-        <p class="form-sub">
-          Enter your email to reset password.
-        </p>
-
-      </div>
-
-      <form id="forgotForm" class="signup-form">
-
-        <div class="field-group">
-
-          <label class="field-label">
-            Email
-          </label>
-
-          <input
-            type="email"
-            id="email"
-            class="field-input"
-            placeholder="you@example.com"
-            required
-          />
-
+          <p class="signup-prompt">
+            Remember it? <a href="login.html" class="signup-link">Back to sign in</a>
+          </p>
         </div>
 
-        <button type="submit" class="submit-btn">
-          Send Reset Link
-        </button>
+        <!-- Success state -->
+        <div id="successView" style="display:none; text-align:center;">
+          <div style="margin: 0 auto 20px; width:52px; height:52px; border-radius:50%; background:rgba(34,197,94,0.12); display:flex; align-items:center; justify-content:center;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <h2 class="form-title" style="margin-bottom:8px">Check your inbox</h2>
+          <p class="form-sub" style="margin-bottom:28px">We sent a reset link to <strong id="sentEmail" style="color:#f1f5f9"></strong>. Check spam if you don't see it.</p>
+          <a href="login.html" class="submit-btn" style="text-decoration:none; display:flex;">Back to sign in</a>
+          <p class="signup-prompt" style="margin-top:16px">
+            Wrong email? <button type="button" id="retryBtn" class="signup-link" style="background:none;border:none;cursor:pointer;padding:0;font-size:inherit">Try again</button>
+          </p>
+        </div>
 
-      </form>
-
-    </div>
-
-  </div>
+      </div>
+    </section>
+  </main>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="./scripts/design/toast.js"></script>
   <script src="./scripts/config.js?v=2"></script>
   <script src="./scripts/auth/firebase-config.js"></script>
-  <script src="./scripts/auth/fpass.js?v=2"></script>
-
+  <script src="./scripts/auth/fpass.js?v=3"></script>
 </body>
-
 </html>
