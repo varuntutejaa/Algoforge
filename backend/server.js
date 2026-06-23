@@ -985,6 +985,69 @@ app.get('/api/leetcode-contests', async (req, res) => {
   }
 });
 
+let atContestsCache = null;
+let atCacheTime = 0;
+app.get('/api/atcoder-contests', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (atContestsCache && now - atCacheTime < 10 * 60 * 1000) {
+      return res.json(atContestsCache);
+    }
+    const html = await fetch('https://atcoder.jp/contests/?lang=en', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      }
+    }).then(r => r.text());
+
+    // Extract upcoming contests table
+    const tableMatch = html.match(/Upcoming Contests[\s\S]*?<\/table>/);
+    if (!tableMatch) return res.json({ contests: [] });
+
+    const rowRegex = /<tr>([\s\S]*?)<\/tr>/g;
+    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
+    const contests = [];
+    let rowMatch;
+
+    while ((rowMatch = rowRegex.exec(tableMatch[0])) !== null) {
+      const cells = [];
+      let cellMatch;
+      const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/g;
+      while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) cells.push(cellMatch[1]);
+      if (cells.length < 4) continue;
+
+      const timeMatch = cells[0].match(/<time[^>]*>([^<]+)<\/time>/);
+      const linkMatch = cells[1].match(/href="\/contests\/([^"]+)"[^>]*>([^<\n]+)/);
+      const durMatch  = cells[2].match(/(\d+):(\d+)/);
+      if (!timeMatch || !linkMatch || !durMatch) continue;
+
+      // Parse "2026-06-27 21:00:00+0900" → ms
+      const startStr = timeMatch[1].trim().replace(' ', 'T');
+      const startMs  = new Date(startStr).getTime();
+      if (isNaN(startMs)) continue;
+
+      const durationMins = parseInt(durMatch[1]) * 60 + parseInt(durMatch[2]);
+      const endMs = startMs + durationMins * 60 * 1000;
+      if (endMs < now) continue; // already ended
+
+      contests.push({
+        id:           linkMatch[1].trim(),
+        title:        linkMatch[2].trim(),
+        startTime:    startMs,
+        endTime:      endMs,
+        durationMins,
+        rateChange:   '',
+      });
+    }
+
+    atContestsCache = { contests };
+    atCacheTime = now;
+    res.json(atContestsCache);
+  } catch (err) {
+    res.status(500).json({ contests: [], error: err.message });
+  }
+});
+
 // Debug endpoint: check if Firebase env vars are set (remove in production)
 app.get("/api/health", (req, res) => {
     const firebaseAdmin = require('./firebase-admin');
@@ -1714,6 +1777,10 @@ app.listen(8000, () => {
         try {
             await fetch('http://localhost:8000/api/codechef-contests');
             console.log('✅ CodeChef cache warmed');
+        } catch {}
+        try {
+            await fetch('http://localhost:8000/api/atcoder-contests');
+            console.log('✅ AtCoder cache warmed');
         } catch {}
     }, 100);
 });

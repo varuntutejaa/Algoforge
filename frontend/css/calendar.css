@@ -178,6 +178,9 @@ body {
 .sui-bar.cc { background: #b45309; }
 .sui-bar.cc.active { background: #4ade80; }
 .sui-bar.cc.ended { background: #334155; }
+.sui-bar.at { background: #00bcd4; }
+.sui-bar.at.active { background: #4ade80; }
+.sui-bar.at.ended { background: #334155; }
 
 .sui-cf-badge {
   display: inline-block;
@@ -351,6 +354,12 @@ body {
   background: rgba(180,83,9,0.1);
 }
 
+.pf-btn.at.active {
+  color: #00bcd4;
+  border-color: rgba(0,188,212,0.4);
+  background: rgba(0,188,212,0.1);
+}
+
 .pf-btn:hover { opacity: 1; }
 
 /* ---- Month View ---- */
@@ -512,6 +521,24 @@ body {
 }
 
 .event-chip.cc.ended {
+  background: rgba(51,65,85,0.4);
+  color: #475569;
+  border-left-color: #334155;
+}
+
+.event-chip.at {
+  background: rgba(0,188,212,0.15);
+  color: #67e8f9;
+  border-left-color: #00bcd4;
+}
+
+.event-chip.at.active {
+  background: rgba(74,222,128,0.15);
+  color: #86efac;
+  border-left-color: #4ade80;
+}
+
+.event-chip.at.ended {
   background: rgba(51,65,85,0.4);
   color: #475569;
   border-left-color: #334155;
@@ -721,6 +748,24 @@ body {
 }
 
 .week-event.cc.ended {
+  background: rgba(51,65,85,0.4);
+  color: #475569;
+  border-left-color: #334155;
+}
+
+.week-event.at {
+  background: rgba(0,188,212,0.18);
+  color: #67e8f9;
+  border-left-color: #00bcd4;
+}
+
+.week-event.at.active {
+  background: rgba(74,222,128,0.2);
+  color: #86efac;
+  border-left-color: #4ade80;
+}
+
+.week-event.at.ended {
   background: rgba(51,65,85,0.4);
   color: #475569;
   border-left-color: #334155;
@@ -998,6 +1043,29 @@ body {
 
 .ep-btn-cc:hover { background: rgba(180,83,9,0.22); }
 
+.ep-at-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(0,188,212,0.12);
+  color: #67e8f9;
+  border: 1px solid rgba(0,188,212,0.28);
+}
+
+.ep-btn-at {
+  background: rgba(0,188,212,0.13);
+  color: #67e8f9;
+  border: 1px solid rgba(0,188,212,0.3);
+}
+
+.ep-btn-at:hover { background: rgba(0,188,212,0.22); }
+
 .gcal-logo {
   width: 16px;
   height: 16px;
@@ -1153,6 +1221,21 @@ body {
   border-left-color: #334155;
 }
 
+.day-event.at {
+  background: rgba(0,188,212,0.13);
+  border-left-color: #00bcd4;
+}
+
+.day-event.at.active {
+  background: rgba(74,222,128,0.12);
+  border-left-color: #4ade80;
+}
+
+.day-event.at.ended {
+  background: rgba(51,65,85,0.35);
+  border-left-color: #334155;
+}
+
 .day-event-header {
   display: flex;
   align-items: center;
@@ -1225,6 +1308,10 @@ body {
   border-radius: 3px;
 }
 
+.at-logo-icon {
+  border-radius: 3px;
+}
+
 .event-chip .cf-logo-icon { width: 12px; height: 12px; }
 .week-event .cf-logo-icon  { width: 12px; height: 12px; margin-bottom: 1px; }
 .day-event  .cf-logo-icon  { width: 14px; height: 14px; }
@@ -1232,9 +1319,11 @@ body {
 .ep-cf-badge .cf-logo-icon { width: 13px; height: 13px; }
 .ep-lc-badge .cf-logo-icon { width: 13px; height: 13px; }
 .ep-cc-badge .cf-logo-icon { width: 13px; height: 13px; }
+.ep-at-badge .cf-logo-icon { width: 13px; height: 13px; }
 .ep-btn-cf  .cf-logo-icon  { width: 16px; height: 16px; }
 .ep-btn-lc  .cf-logo-icon  { width: 16px; height: 16px; }
 .ep-btn-cc  .cf-logo-icon  { width: 16px; height: 16px; }
+.ep-btn-at  .cf-logo-icon  { width: 16px; height: 16px; }
 
 /* ---- Event panel top row ---- */
 .ep-top-row {
