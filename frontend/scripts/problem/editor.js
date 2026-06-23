@@ -648,8 +648,10 @@ async function fetchCodeReview() {
     const data = await res.json();
     if (data.review) {
       showAiResponse('Code Review', data.review);
+    } else if (data.error === 'AI service not configured') {
+      showAiResponse('Code Review', 'AI service is not configured on the server. Add GROQ_API_KEY to your Render environment variables.');
     } else {
-      showAiResponse('Code Review', 'Could not generate review. Please try again.');
+      showAiResponse('Code Review', data.error || 'Could not generate review. Please try again.');
     }
   } catch {
     showAiResponse('Code Review', 'Network error. Check your connection and try again.');
@@ -796,8 +798,10 @@ async function fetchAiHint(hintNumber) {
     const data = await res.json();
     if (data.hint) {
       showHintResponse(label, data.hint);
+    } else if (data.error === 'AI service not configured') {
+      showHintResponse(label, 'AI service is not configured on the server. Add GROQ_API_KEY to your Render environment variables.');
     } else {
-      showHintResponse(label, 'Could not generate hint. Please try again.');
+      showHintResponse(label, data.error || 'Could not generate hint. Please try again.');
     }
   } catch {
     showHintResponse(label, 'Network error. Check your connection and try again.');
