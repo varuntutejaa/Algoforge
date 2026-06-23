@@ -699,6 +699,7 @@ body {
 .week-col {
   border-left: 1px solid rgba(255,255,255,0.04);
   position: relative;
+  min-height: calc(24 * 60px);
 }
 
 .week-col:last-child { border-right: 1px solid rgba(255,255,255,0.04); }

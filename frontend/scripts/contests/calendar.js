@@ -479,21 +479,37 @@
     });
 
     const todayIdx = days.findIndex(d => isToday(d.getFullYear(), d.getMonth(), d.getDate()));
-    if (todayIdx >= 0) {
+    const cols = weekCols.querySelectorAll('.week-col');
+    if (todayIdx >= 0 && cols[todayIdx]) {
       const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
       const topPx = (nowMins / 60) * 60;
-      const cols = weekCols.querySelectorAll('.week-col');
-      if (cols[todayIdx]) {
-        const line = document.createElement('div');
-        line.className = 'week-now-line';
-        line.style.top = `${topPx}px`;
-        cols[todayIdx].appendChild(line);
-        setTimeout(() => {
-          const body = cols[todayIdx].closest('.week-body');
-          if (body) body.scrollTop = Math.max(0, topPx - 120);
-        }, 50);
-      }
+      const line = document.createElement('div');
+      line.className = 'week-now-line';
+      line.style.top = `${topPx}px`;
+      cols[todayIdx].appendChild(line);
     }
+
+    // Scroll to the first upcoming contest this week, or to current time if today is visible
+    setTimeout(() => {
+      const body = weekCols.closest('.week-body');
+      if (!body) return;
+      const now = Date.now();
+      const weekContests = days.flatMap(d =>
+        contestsOnDay(d.getFullYear(), d.getMonth(), d.getDate())
+          .filter(c => new Date(c.endsAt).getTime() > now)
+      ).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+
+      if (weekContests.length) {
+        const first = new Date(weekContests[0].startsAt);
+        const firstMins = first.getHours() * 60 + first.getMinutes();
+        body.scrollTop = Math.max(0, (firstMins / 60) * 60 - 120);
+      } else if (todayIdx >= 0) {
+        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+        body.scrollTop = Math.max(0, (nowMins / 60) * 60 - 120);
+      } else {
+        body.scrollTop = 480; // default to ~8 AM
+      }
+    }, 50);
   }
 
   // ---- Day event column layout (no overlaps) ----
