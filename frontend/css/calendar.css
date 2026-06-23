@@ -410,19 +410,22 @@ body {
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: 1fr;
+  grid-auto-rows: minmax(95px, 130px);
   flex: 1;
   overflow-y: auto;
+  align-content: start;
 }
 
 .month-cell {
   border-right: 1px solid rgba(255,255,255,0.04);
   border-bottom: 1px solid rgba(255,255,255,0.04);
   padding: 6px 8px;
-  min-height: 110px;
+  min-height: 95px;
+  max-height: 130px;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  overflow: hidden;
   position: relative;
   cursor: default;
   transition: background 0.12s;
