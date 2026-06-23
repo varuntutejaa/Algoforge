@@ -12,12 +12,25 @@
     return source.charAt(0).toUpperCase();
   }
 
+  function refreshPhotoURLFromFirebase() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.auth) return;
+      const fbUser = firebase.auth().currentUser;
+      if (!fbUser || !fbUser.photoURL) return;
+      const stored = getStoredUser();
+      if (!stored || stored.photoURL === fbUser.photoURL) return;
+      stored.photoURL = fbUser.photoURL;
+      localStorage.setItem('algoforge-user', JSON.stringify(stored));
+    } catch {}
+  }
+
   function renderProfileNav(container) {
+    refreshPhotoURLFromFirebase();
     const user = getStoredUser();
     const isLoggedIn = user && (user.name || user.email);
     const displayName = user?.name || user?.email || 'User';
     const avatarContent = user?.photoURL
-      ? `<img src="${user.photoURL}" alt="${displayName}">`
+      ? `<img src="${user.photoURL}" alt="${displayName}" referrerpolicy="no-referrer">`
       : getInitials(user?.name, user?.email);
 
     if (!isLoggedIn) {
@@ -74,6 +87,49 @@
     });
   }
 
+  function getDailyProblemId(problems) {
+    if (!problems.length) return null;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return problems[dayOfYear % problems.length].id;
+  }
+
+  async function fetchAndRenderStreak(el) {
+    const user = getStoredUser();
+    if (!user) return;
+    const idToken = localStorage.getItem('algoforge-id-token');
+    if (!idToken) return;
+    try {
+      const apiBase = (typeof API_BASE_URL !== 'undefined') ? API_BASE_URL : 'http://localhost:8000';
+      const [streakRes, problemsRes] = await Promise.all([
+        fetch(`${apiBase}/profile/streak`, { headers: { 'Authorization': `Bearer ${idToken}` } }),
+        fetch(`${apiBase}/problems`)
+      ]);
+      if (streakRes.ok) {
+        const data = await streakRes.json();
+        const streak = data.currentStreak || 0;
+        const solvedToday = !!data.solvedToday;
+        el.querySelector('.nav-streak-count').textContent = streak;
+        if (streak === 0) {
+          el.classList.add('streak-zero');
+          el.title = 'No active streak — solve today\'s daily challenge!';
+        } else if (solvedToday) {
+          el.title = `${streak}-day streak — you've solved today's challenge!`;
+        } else {
+          el.classList.add('streak-at-risk');
+          el.title = `${streak}-day streak — solve today's challenge to keep it going!`;
+        }
+      }
+      if (problemsRes.ok) {
+        const pdata = await problemsRes.json();
+        const problems = pdata.problems || pdata || [];
+        const dailyId = getDailyProblemId(problems);
+        if (dailyId) el.href = `editor.html?problem=${encodeURIComponent(dailyId)}`;
+      }
+    } catch {}
+  }
+
   window.initAppNav = function initAppNav() {
     const mount = document.getElementById('profileNav');
     if (mount) {
@@ -85,7 +141,27 @@
       center.innerHTML = `
         <a href="problems.html">Problems</a>
         <a href="contests.html">Contests</a>
+        <a href="calendar.html">Calendar</a>
       `;
+    }
+    // render streak badge for logged-in users — inside profileNav, left of profile menu
+    const user = getStoredUser();
+    if (user && mount) {
+      mount.style.display = 'flex';
+      mount.style.alignItems = 'center';
+      mount.style.gap = '10px';
+      const streakEl = document.createElement('a');
+      streakEl.href = 'problems.html';
+      streakEl.className = 'nav-streak';
+      streakEl.title = 'Daily streak';
+      streakEl.innerHTML = `
+        <svg class="nav-streak-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C12 2 9 7 9 11C9 12.5 9.5 14 10 15C9 14.5 8 13 8 11C8 11 5 14 5 17C5 20.3 8.1 23 12 23C15.9 23 19 20.3 19 17C19 12 12 2 12 2Z" fill="currentColor"/>
+        </svg>
+        <span class="nav-streak-count">0</span>
+      `;
+      mount.prepend(streakEl);
+      fetchAndRenderStreak(streakEl);
     }
   };
 

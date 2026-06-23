@@ -51,7 +51,9 @@
           id: data.user.id,
           uid: data.user.firebaseUid || "",
           firebaseUid: data.user.firebaseUid || "",
-          name: data.user.name, email: data.user.email
+          name: data.user.name,
+          email: data.user.email,
+          photoURL: data.user.profilePicture || ""
         }));
         showToast('Account created! Redirecting…', 'success');
         setTimeout(() => { window.location.href = 'problems.html'; }, 900);

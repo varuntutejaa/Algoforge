@@ -32,7 +32,8 @@ const languageIds = {
     c: 50,
     cpp: 54,
     java: 62,
-    js: 63
+    js: 63,
+    python: 71
 };
 
 function buildTwoSumJudgeSource(language, sourceCode) {
@@ -151,6 +152,24 @@ function buildTwoSumJudgeSource(language, sourceCode) {
         ].join('\n');
     }
 
+    if (language === "python") {
+        return [
+            sourceCode,
+            '',
+            'import sys',
+            'data = sys.stdin.read().split()',
+            'idx = 0',
+            'n = int(data[idx]); idx += 1',
+            'nums = [int(data[idx + i]) for i in range(n)]; idx += n',
+            'target = int(data[idx])',
+            'answer = twoSum(nums, target)',
+            'if isinstance(answer, list) and len(answer) >= 2:',
+            '    print(answer[0], answer[1])',
+            'else:',
+            '    print("NO_ANSWER")'
+        ].join('\n');
+    }
+
     return sourceCode;
 }
 
@@ -208,6 +227,15 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const n = input[idx++];',
                 'const nums = input.slice(idx, idx + n);',
                 'console.log(solution(nums));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0])',
+                'nums = [int(data[i+1]) for i in range(n)]',
+                'print(solution(nums))'
             ].join('\n')
         },
         "array-to-array": {
@@ -281,6 +309,16 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const nums = input.slice(idx, idx + n);',
                 'const result = solution(nums);',
                 'console.log(result.join(" "));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0])',
+                'nums = [int(data[i+1]) for i in range(n)]',
+                'result = solution(nums)',
+                "print(' '.join(map(str, result)))"
             ].join('\n')
         },
         "array-k-to-array": {
@@ -354,6 +392,16 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const nums = input.slice(idx, idx + n);',
                 'const result = solution(nums, k);',
                 'console.log(result.join(" "));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0]); k = int(data[1])',
+                'nums = [int(data[i+2]) for i in range(n)]',
+                'result = solution(nums, k)',
+                "print(' '.join(map(str, result)))"
             ].join('\n')
         },
         "array-k-inplace": {
@@ -425,6 +473,16 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const nums = input.slice(idx, idx + n);',
                 'solution(nums, k);',
                 'console.log(nums.join(" "));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0]); k = int(data[1])',
+                'nums = [int(data[i+2]) for i in range(n)]',
+                'solution(nums, k)',
+                "print(' '.join(map(str, nums)))"
             ].join('\n')
         },
         "array-inplace": {
@@ -496,6 +554,16 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const nums = input.slice(idx, idx + n);',
                 'solution(nums);',
                 'console.log(nums.join(" "));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0])',
+                'nums = [int(data[i+1]) for i in range(n)]',
+                'solution(nums)',
+                "print(' '.join(map(str, nums)))"
             ].join('\n')
         },
         "intervals": {
@@ -560,6 +628,17 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'for (let i = 0; i < n; i++) intervals.push([input[idx++], input[idx++]]);',
                 'const result = solution(intervals);',
                 'result.forEach(iv => console.log(iv[0] + " " + iv[1]));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0])',
+                'intervals = [[int(data[1+i*2]), int(data[1+i*2+1])] for i in range(n)]',
+                'result = solution(intervals)',
+                'for iv in result:',
+                '    print(iv[0], iv[1])'
             ].join('\n')
         },
         "words-k": {
@@ -630,6 +709,16 @@ function buildGenericRunner(runnerType, language, sourceCode) {
                 'const words = input.slice(idx, idx + n);',
                 'const result = solution(words, k);',
                 'console.log(result.join(" "));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'n = int(data[0]); k = int(data[1])',
+                'words = data[2:2+n]',
+                'result = solution(words, k)',
+                "print(' '.join(result))"
             ].join('\n')
         }
     };
@@ -743,6 +832,33 @@ function formatProblem(problem) {
     };
 }
 
+// Add Python boilerplates to any problems missing them
+async function migratePythonBoilerplates() {
+    const pythonBoilerplates = {
+        'two-sum': 'def twoSum(nums, target):\n    # Write your solution here\n    pass',
+        'array-to-int': 'def solution(nums):\n    # Write your solution here\n    pass',
+        'array-to-array': 'def solution(nums):\n    # Write your solution here\n    pass',
+        'array-k-to-array': 'def solution(nums, k):\n    # Write your solution here\n    pass',
+        'array-k-inplace': 'def solution(nums, k):\n    # Write your solution here\n    pass',
+        'array-inplace': 'def solution(nums):\n    # Write your solution here\n    pass',
+        'intervals': 'def solution(intervals):\n    # Write your solution here\n    pass',
+        'words-k': 'def solution(words, k):\n    # Write your solution here\n    pass',
+    };
+    try {
+        const problems = await Problem.find({}).lean();
+        for (const p of problems) {
+            if (p.boilerplate && !p.boilerplate.get ? !p.boilerplate['python'] : !(p.boilerplate instanceof Map ? p.boilerplate.get('python') : p.boilerplate['python'])) {
+                const runnerKey = p.runner || 'array-to-int';
+                const pyBoiler = pythonBoilerplates[runnerKey] || pythonBoilerplates['array-to-int'];
+                await Problem.updateOne({ _id: p._id }, { $set: { 'boilerplate.python': pyBoiler } });
+                console.log(`✅ Added Python boilerplate to: ${p.id}`);
+            }
+        }
+    } catch (e) {
+        console.error('Python boilerplate migration error:', e.message);
+    }
+}
+
 //connect to MongoDB
 // Improved mongoose connection with retries and better logging
 const mongooseOptions = {
@@ -761,6 +877,7 @@ async function connectWithRetry(retries = 5, delayMs = 3000) {
         try {
             await mongoose.connect(uri, mongooseOptions);
             console.log('MongoDB Connected');
+            migratePythonBoilerplates();
             return;
         } catch (err) {
             console.error(`MongoDB connection attempt ${attempt} failed: ${err.message}`);
@@ -784,6 +901,89 @@ connectWithRetry();
 
 // Mount contest routes (optionalAuth so Firebase token is verified when present)
 app.use('/api/contests', optionalAuth, contestRoutes);
+
+// Proxy: LeetCode upcoming contests via GraphQL (avoids browser CORS restriction)
+let cfContestsCache = null;
+let cfCacheTime = 0;
+app.get('/api/codeforces-contests', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (cfContestsCache && now - cfCacheTime < 5 * 60 * 1000) {
+      return res.json(cfContestsCache);
+    }
+    const apiRes = await fetch('https://codeforces.com/api/contest.list?gym=false', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlgoForge/1.0)' }
+    });
+    const data = await apiRes.json();
+    if (data.status !== 'OK') return res.status(502).json({ contests: [], error: 'CF API error' });
+    const contests = data.result.filter(c => c.phase === 'BEFORE' || c.phase === 'CODING');
+    cfContestsCache = { contests };
+    cfCacheTime = now;
+    res.json(cfContestsCache);
+  } catch (err) {
+    res.status(500).json({ contests: [], error: err.message });
+  }
+});
+
+let ccContestsCache = null;
+let ccCacheTime = 0;
+app.get('/api/codechef-contests', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (ccContestsCache && now - ccCacheTime < 10 * 60 * 1000) {
+      return res.json(ccContestsCache);
+    }
+    const apiRes = await fetch(
+      'https://www.codechef.com/api/list/contests/all?sort_by=START&sorting_order=asc&offset=0&mode=all',
+      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlgoForge/1.0)' } }
+    );
+    const data = await apiRes.json();
+    const contests = (data.future_contests || []).map(c => ({
+      code: c.contest_code,
+      name: c.contest_name,
+      startTime: c.contest_start_date_iso,
+      endTime: c.contest_end_date_iso,
+      durationMins: Number(c.contest_duration),
+    }));
+    ccContestsCache = { contests };
+    ccCacheTime = now;
+    res.json(ccContestsCache);
+  } catch (err) {
+    res.status(500).json({ contests: [], error: err.message });
+  }
+});
+
+let lcContestsCache = null;
+let lcCacheTime = 0;
+app.get('/api/leetcode-contests', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (lcContestsCache && now - lcCacheTime < 10 * 60 * 1000) {
+      return res.json(lcContestsCache);
+    }
+    const gqlRes = await fetch('https://leetcode.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Referer': 'https://leetcode.com',
+        'User-Agent': 'Mozilla/5.0 (compatible; AlgoForge/1.0)',
+      },
+      body: JSON.stringify({
+        query: `{ allContests { title titleSlug startTime duration isVirtual containsPremium } }`
+      }),
+    });
+    const data = await gqlRes.json();
+    const allContests = (data.data?.allContests || []);
+    const filtered = allContests.filter(c =>
+      !c.isVirtual && !c.containsPremium && (c.startTime * 1000 + c.duration * 1000) > now
+    );
+    lcContestsCache = { contests: filtered };
+    lcCacheTime = now;
+    res.json(lcContestsCache);
+  } catch (err) {
+    res.status(500).json({ contests: [], error: err.message });
+  }
+});
 
 // Debug endpoint: check if Firebase env vars are set (remove in production)
 app.get("/api/health", (req, res) => {
@@ -854,6 +1054,31 @@ app.get("/profile", verifyFirebaseToken, async (req, res) => {
             success: false,
             message: "Failed to fetch profile"
         });
+    }
+});
+
+// Get current streak
+app.get("/profile/streak", verifyFirebaseToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { startOfDay } = require('./utils/profileHelpers');
+        const today = startOfDay(new Date());
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        const lastActivity = user.lastActivityDate ? startOfDay(user.lastActivityDate) : null;
+        const isActive = lastActivity && (
+            lastActivity.getTime() === today.getTime() ||
+            lastActivity.getTime() === yesterday.getTime()
+        );
+        const solvedToday = !!(lastActivity && lastActivity.getTime() === today.getTime());
+        // streak expired — reset DB value so it doesn't linger
+        if (!isActive && user.currentStreak > 0) {
+            user.currentStreak = 0;
+            await user.save();
+        }
+        const currentStreak = isActive ? (user.currentStreak || 0) : 0;
+        res.json({ currentStreak, longestStreak: user.longestStreak || 0, solvedToday });
+    } catch (error) {
+        res.status(500).json({ currentStreak: 0, longestStreak: 0, solvedToday: false });
     }
 });
 
@@ -1172,6 +1397,187 @@ app.post("/problems", async (req, res) => {
     }
 });
 
+// AI Code Review endpoint
+app.post('/api/review', optionalAuth, async (req, res) => {
+    const { problemId, code, language } = req.body;
+    if (!problemId || !code) return res.status(400).json({ error: 'Missing problemId or code' });
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) return res.status(503).json({ error: 'AI service not configured' });
+
+    try {
+        const problemDoc = await Problem.findOne({ id: problemId }).lean();
+        if (!problemDoc) return res.status(404).json({ error: 'Problem not found' });
+
+        const title       = problemDoc.title || '';
+        const description = (problemDoc.description || []).join('\n');
+        const constraints = (problemDoc.constraints || []).join('\n');
+
+        const systemPrompt = `You are an expert code reviewer for competitive programming. The user has just solved a problem successfully (all test cases passed). Provide a structured review of their solution.
+
+Your review MUST follow exactly this format with these exact section headers:
+**Time Complexity**
+[Analysis]
+
+**Space Complexity**
+[Analysis]
+
+**What You Did Well**
+[1-2 specific positives]
+
+**How to Improve**
+[2-3 concrete suggestions to optimize or clean up the code — mention specific lines or patterns if possible]
+
+**Alternative Approaches**
+[2-3 different ways to solve this problem with a one-line tradeoff for each — e.g. brute force, different data structure, mathematical insight. Mention their time/space complexity briefly.]
+
+Be concise, precise, and educational. Do not re-explain the problem. Do not write full working code for any approach.`;
+
+        const userMessage = `Problem: ${title}
+
+Description:
+${description}
+
+Constraints:
+${constraints}
+
+My accepted ${language} solution:
+\`\`\`${language}
+${code.trim().slice(0, 2000)}
+\`\`\`
+
+Please review my solution.`;
+
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${groqKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user',   content: userMessage }
+                ],
+                temperature: 0.4,
+                max_tokens: 700
+            })
+        });
+
+        if (!groqRes.ok) {
+            const err = await groqRes.text();
+            return res.status(502).json({ error: 'AI service error', detail: err });
+        }
+
+        const groqData = await groqRes.json();
+        const review = groqData.choices?.[0]?.message?.content?.trim() || 'Review unavailable.';
+        res.json({ review });
+    } catch (err) {
+        console.error('Review endpoint error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// AI Hint endpoint
+app.post('/api/hint', optionalAuth, async (req, res) => {
+    const { problemId, hintNumber, code, language, elapsedSeconds } = req.body;
+    if (!problemId || !hintNumber) return res.status(400).json({ error: 'Missing problemId or hintNumber' });
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) return res.status(503).json({ error: 'AI service not configured' });
+
+    try {
+        const problemDoc = await Problem.findOne({ id: problemId }).lean();
+        if (!problemDoc) return res.status(404).json({ error: 'Problem not found' });
+
+        const title       = problemDoc.title || '';
+        const description = (problemDoc.description || []).join('\n');
+        const constraints = (problemDoc.constraints || []).join('\n');
+        const examples    = (problemDoc.examples || []).map((ex, i) =>
+            `Example ${i + 1}:\n  Input: ${ex.input}\n  Output: ${ex.output}${ex.explanation ? '\n  Explanation: ' + ex.explanation : ''}`
+        ).join('\n');
+        const testCases   = (problemDoc.testCases || []).slice(0, 3).map((tc, i) =>
+            `Test ${i + 1}: input=${JSON.stringify(tc.input)} expected=${JSON.stringify(tc.output)}`
+        ).join('\n');
+
+        const elapsedMin  = Math.floor((elapsedSeconds || 0) / 60);
+        const hasCode     = code && code.trim().length > 10;
+        const codeSnippet = hasCode ? code.trim().slice(0, 1200) : null;
+
+        const hintPersonality = [
+            `You are giving Hint 1 of 3. The user has spent ~${elapsedMin} minutes on this problem. Give a very gentle conceptual nudge — point them toward the right problem-solving pattern or ask a guiding question. Do NOT name the algorithm or data structure directly. Do NOT reveal any implementation step. 2-3 sentences max.`,
+            `You are giving Hint 2 of 3. The user has spent ~${elapsedMin} minutes. Look at their current code approach if provided. If they are on the wrong track, gently redirect them. If on the right track, hint at the key insight they are missing without revealing the solution. Mention time/space complexity to think about if relevant. 3-4 sentences max.`,
+            `You are giving Hint 3 of 3. The user has spent ~${elapsedMin} minutes. Examine their code closely. Identify the specific step or logic gap that is blocking them. Give a concrete implementation hint — describe what to do next without writing the code for them. You may reference a specific line or concept in their code. 4-5 sentences max.`
+        ][hintNumber - 1];
+
+        const systemPrompt = `You are a helpful coding mentor giving progressive hints for a LeetCode-style problem.
+${hintPersonality}
+Rules:
+- Never provide a complete solution or full algorithm
+- Never write out the final working code
+- Be encouraging and Socratic
+- Keep the hint tight and focused on ONE thing
+- If the user has no code yet, focus on the problem pattern only`;
+
+        const userMessage = `Problem: ${title}
+
+Description:
+${description}
+
+Constraints:
+${constraints}
+
+Examples:
+${examples}
+
+Test Cases:
+${testCases}
+
+${codeSnippet ? `User's current ${language || 'code'} (${elapsedMin} min in):\n\`\`\`\n${codeSnippet}\n\`\`\`` : `The user has not written any code yet (${elapsedMin} min in).`}
+
+Give Hint ${hintNumber}.`;
+
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${groqKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user',   content: userMessage }
+                ],
+                temperature: 0.5,
+                max_tokens: 300
+            })
+        });
+
+        if (!groqRes.ok) {
+            const err = await groqRes.text();
+            return res.status(502).json({ error: 'AI service error', detail: err });
+        }
+
+        const groqData = await groqRes.json();
+        const hint = groqData.choices?.[0]?.message?.content?.trim() || 'No hint available.';
+        res.json({ hint });
+    } catch (err) {
+        console.error('Hint endpoint error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+async function getDailyProblemId() {
+    const problems = await Problem.find().select('id').sort({ createdAt: 1 }).lean();
+    if (!problems.length) return null;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return problems[dayOfYear % problems.length].id;
+}
+
 // Submit code for evaluation
 app.post("/submit-code", optionalAuth, async (req, res) => {
     try {
@@ -1231,7 +1637,11 @@ app.post("/submit-code", optionalAuth, async (req, res) => {
             if (passed && verdict === "Accepted") {
                 user.acceptedSubmissions += 1;
                 user.problemsSolved = (user.problemsSolved || 0) + 1;
-                updateStreak(user);
+
+                const dailyId = await getDailyProblemId();
+                if (dailyId && problem.id === dailyId) {
+                    updateStreak(user);
+                }
 
                 const alreadySolved = user.solvedProblems.some(
                     (entry) => entry.problemId === problem.id
@@ -1290,4 +1700,20 @@ app.use(express.static(path.join(frontendRoot, "pages")));
 app.listen(8000, () => {
     console.log("Server running on 8000");
     console.log("Frontend: https://algoforge-1-mbk5.onrender.com/index.html");
+
+    // Pre-warm external contest caches so first user doesn't wait
+    setTimeout(async () => {
+        try {
+            await fetch('http://localhost:8000/api/codeforces-contests');
+            console.log('✅ Codeforces cache warmed');
+        } catch {}
+        try {
+            await fetch('http://localhost:8000/api/leetcode-contests');
+            console.log('✅ LeetCode cache warmed');
+        } catch {}
+        try {
+            await fetch('http://localhost:8000/api/codechef-contests');
+            console.log('✅ CodeChef cache warmed');
+        } catch {}
+    }, 100);
 });

@@ -74,8 +74,10 @@
           </button>
         </div>
 
-        <button class="review-code-btn" id="reviewCodeBtn">
-          <span>⟳</span> Review My Code
+        <button class="review-code-btn locked" id="reviewCodeBtn" disabled>
+          <span class="review-lock-icon">🔒</span>
+          <span class="review-btn-label">Review My Code</span>
+          <span class="review-btn-sub">solve to unlock</span>
         </button>
 
         <div class="ai-response-panel" id="aiResponsePanel" style="display:none">
@@ -90,6 +92,10 @@
               <span class="ai-loading-dot"></span>
             </div>
             <div id="aiResponseText" style="display:none"></div>
+            <div class="hint-disclaimer" id="hintDisclaimer" style="display:none">
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 4a1 1 0 011 1v4a1 1 0 11-2 0V7a1 1 0 011-1zm0 8a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/></svg>
+              Hints guide your thinking — they won't hand you the solution. Each hint builds on the previous one based on your code and time spent.
+            </div>
           </div>
         </div>
       </section>
@@ -107,9 +113,11 @@
           <option value="cpp" selected>C++</option>
           <option value="java">Java</option>
           <option value="js">JavaScript</option>
+          <option value="python">Python</option>
         </select>
       </div>
 
+      <div id="solutionTabBar" class="solution-tab-bar"></div>
       <div id="codeEditor" class="code-editor" role="textbox" aria-label="Code editor"></div>
 
       <div class="editor-actions">

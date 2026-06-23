@@ -32,7 +32,8 @@ const monacoLanguages = {
   c: 'c',
   cpp: 'cpp',
   java: 'java',
-  js: 'javascript'
+  js: 'javascript',
+  python: 'python'
 };
 
 let problem = null;
@@ -42,6 +43,11 @@ let lastSavedContent = '';
 let hasUnsavedChanges = false;
 let autoSaveTimer = null;
 let isSwitchingLanguage = false;
+
+// Multi-solution tabs
+let activeSolutionIdx = 0;
+let solutionCount = 1;
+const MAX_SOLUTIONS = 5;
 
 function escapeHtml(value) {
   return String(value)
@@ -60,21 +66,160 @@ function canPersistCode() {
   return Boolean(getCurrentUser()?.id && problem?.id);
 }
 
-function localCodeKey(language) {
-  return `af-code-${problemId}-${language}`;
+function localCodeKey(language, solIdx) {
+  const idx = solIdx !== undefined ? solIdx : activeSolutionIdx;
+  // idx 0 keeps original key for backward compat
+  return idx === 0 ? `af-code-${problemId}-${language}` : `af-code-${problemId}-${language}-s${idx}`;
 }
+
+function solutionCountKey() { return `af-sol-count-${problemId}`; }
 
 function saveCodeLocally(code, language) {
   try { localStorage.setItem(localCodeKey(language), code); } catch (_) {}
 }
 
-function loadCodeLocally(language) {
-  try { return localStorage.getItem(localCodeKey(language)) || null; } catch (_) { return null; }
+function loadCodeLocally(language, solIdx) {
+  try { return localStorage.getItem(localCodeKey(language, solIdx)) || null; } catch (_) { return null; }
 }
 
 function getBoilerplate(language) {
   if (!problem) return '';
   return problem.boilerplate[language] || problem.boilerplate.cpp || '';
+}
+
+/* ── Solution tabs ── */
+function renderSolutionTabs() {
+  const bar = document.getElementById('solutionTabBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  for (let i = 0; i < solutionCount; i++) {
+    const tab = document.createElement('button');
+    tab.className = 'solution-tab' + (i === activeSolutionIdx ? ' active' : '');
+    tab.dataset.idx = i;
+    tab.setAttribute('aria-label', `Solution ${i + 1}`);
+
+    const label = document.createElement('span');
+    label.textContent = `Solution ${i + 1}`;
+    tab.appendChild(label);
+
+    if (i > 0) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'solution-tab-close';
+      closeBtn.textContent = '×';
+      closeBtn.title = 'Remove this solution';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeSolution(i);
+      });
+      tab.appendChild(closeBtn);
+    }
+
+    tab.addEventListener('click', () => switchSolution(i));
+    bar.appendChild(tab);
+  }
+
+  if (solutionCount < MAX_SOLUTIONS) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'solution-tab-add';
+    addBtn.title = 'Add new solution';
+    addBtn.innerHTML = '+';
+    addBtn.addEventListener('click', addSolution);
+    bar.appendChild(addBtn);
+  }
+}
+
+function saveSolutionCount() {
+  try { localStorage.setItem(solutionCountKey(), String(solutionCount)); } catch (_) {}
+}
+
+async function switchSolution(idx) {
+  if (idx === activeSolutionIdx || !monacoEditor) return;
+
+  // save current editor content to current solution slot
+  const lang = languageSelect ? languageSelect.value : 'cpp';
+  saveCodeLocally(monacoEditor.getValue(), lang);
+
+  activeSolutionIdx = idx;
+
+  // load code for new solution slot
+  const saved = loadCodeLocally(lang);
+  const nextValue = saved ?? getBoilerplate(lang);
+  isSwitchingLanguage = true;
+  monacoEditor.setValue(nextValue);
+  lastSavedContent = nextValue;
+  hasUnsavedChanges = false;
+  isSwitchingLanguage = false;
+
+  renderSolutionTabs();
+}
+
+function addSolution() {
+  if (solutionCount >= MAX_SOLUTIONS || !monacoEditor) return;
+
+  // save current code first
+  const lang = languageSelect ? languageSelect.value : 'cpp';
+  saveCodeLocally(monacoEditor.getValue(), lang);
+
+  solutionCount++;
+  saveSolutionCount();
+
+  // switch to the new (empty) slot
+  activeSolutionIdx = solutionCount - 1;
+
+  const boilerplate = getBoilerplate(lang);
+  isSwitchingLanguage = true;
+  monacoEditor.setValue(boilerplate);
+  lastSavedContent = boilerplate;
+  hasUnsavedChanges = false;
+  isSwitchingLanguage = false;
+
+  renderSolutionTabs();
+}
+
+function removeSolution(idx) {
+  if (idx <= 0 || solutionCount <= 1 || !monacoEditor) return;
+
+  // clear localStorage slots for this solution across all languages
+  Object.keys(monacoLanguages).forEach((lang) => {
+    try { localStorage.removeItem(localCodeKey(lang, idx)); } catch (_) {}
+  });
+
+  // shift slots above idx down by 1
+  for (let i = idx + 1; i < solutionCount; i++) {
+    Object.keys(monacoLanguages).forEach((lang) => {
+      const above = loadCodeLocally(lang, i);
+      if (above !== null) {
+        try { localStorage.setItem(localCodeKey(lang, i - 1), above); } catch (_) {}
+      }
+      try { localStorage.removeItem(localCodeKey(lang, i)); } catch (_) {}
+    });
+  }
+
+  solutionCount--;
+  saveSolutionCount();
+
+  // choose which tab to land on
+  const newActive = activeSolutionIdx >= idx ? Math.max(0, activeSolutionIdx - 1) : activeSolutionIdx;
+  activeSolutionIdx = newActive;
+
+  const lang = languageSelect ? languageSelect.value : 'cpp';
+  const saved = loadCodeLocally(lang);
+  const nextValue = saved ?? getBoilerplate(lang);
+  isSwitchingLanguage = true;
+  monacoEditor.setValue(nextValue);
+  lastSavedContent = nextValue;
+  hasUnsavedChanges = false;
+  isSwitchingLanguage = false;
+
+  renderSolutionTabs();
+}
+
+function initSolutionTabs() {
+  const saved = parseInt(localStorage.getItem(solutionCountKey()), 10);
+  solutionCount = (!Number.isNaN(saved) && saved >= 1) ? Math.min(saved, MAX_SOLUTIONS) : 1;
+  activeSolutionIdx = 0;
+  renderSolutionTabs();
 }
 
 function setSolvedBadgeVisible(visible) {
@@ -98,7 +243,9 @@ async function loadSolvedStatus() {
     const data = await response.json();
 
     if (response.ok && data.success) {
-      setSolvedBadgeVisible(data.solvedIds.includes(problem.id));
+      const alreadySolved = data.solvedIds.includes(problem.id);
+      setSolvedBadgeVisible(alreadySolved);
+      if (alreadySolved) unlockReviewBtn();
     }
   } catch (error) {
     console.log(error);
@@ -269,6 +416,8 @@ function renderResults(data, { isSubmit = false } = {}) {
 
   if (isSubmit && data.passed && data.verdict === 'Accepted') {
     setSolvedBadgeVisible(true);
+    unlockReviewBtn();
+    launchCelebration();
   }
 
   let summary;
@@ -389,7 +538,7 @@ async function initMonaco() {
     hasUnsavedChanges = code !== lastSavedContent;
     // Persist to localStorage on every edit (debounced 400ms)
     clearTimeout(localSaveTimer);
-    localSaveTimer = setTimeout(() => saveCodeLocally(code, languageSelect.value), 400);
+    localSaveTimer = setTimeout(() => saveCodeLocally(code, languageSelect.value), 400); // saves to active solution slot
   });
 
   languageSelect.addEventListener('change', async () => {
@@ -402,7 +551,7 @@ async function initMonaco() {
     languageSelect.disabled = true;
 
     const currentCode = monacoEditor.getValue();
-    saveCodeLocally(currentCode, previousLanguage);
+    saveCodeLocally(currentCode, previousLanguage); // saves to current solution slot
     if (canPersistCode() && currentCode !== lastSavedContent) {
       const user = getCurrentUser();
       await fetch(`${API_BASE_URL}/code/save`, {
@@ -445,6 +594,7 @@ async function loadProblem() {
 
     problem = data.problem;
     renderProblem();
+    initSolutionTabs();
     await loadSolvedStatus();
 
     if (resultsPanel && resultsEmpty) {
@@ -465,6 +615,58 @@ async function loadProblem() {
     }
     console.log(error);
   }
+}
+
+function unlockReviewBtn() {
+  const btn = document.getElementById('reviewCodeBtn');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.classList.remove('locked');
+  btn.classList.add('unlocked');
+  const lockIcon = btn.querySelector('.review-lock-icon');
+  const sub      = btn.querySelector('.review-btn-sub');
+  if (lockIcon) lockIcon.textContent = '✦';
+  if (sub) sub.textContent = 'get AI feedback';
+}
+
+async function fetchCodeReview() {
+  const btn = document.getElementById('reviewCodeBtn');
+  const code = monacoEditor ? monacoEditor.getValue() : '';
+  const lang = languageSelect ? languageSelect.value : 'cpp';
+  if (!code.trim() || !problem) return;
+
+  if (btn) { btn.disabled = true; btn.querySelector('.review-btn-label').textContent = 'Reviewing…'; }
+
+  showAiLoading('Code Review');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
+      body: JSON.stringify({ problemId, code, language: lang })
+    });
+    const data = await res.json();
+    if (data.review) {
+      showAiResponse('Code Review', data.review);
+    } else {
+      showAiResponse('Code Review', 'Could not generate review. Please try again.');
+    }
+  } catch {
+    showAiResponse('Code Review', 'Network error. Check your connection and try again.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.querySelector('.review-btn-label').textContent = 'Review My Code';
+    }
+  }
+}
+
+const reviewCodeBtn = document.getElementById('reviewCodeBtn');
+if (reviewCodeBtn) {
+  reviewCodeBtn.addEventListener('click', () => {
+    if (reviewCodeBtn.classList.contains('locked')) return;
+    fetchCodeReview();
+  });
 }
 
 if (runBtn) {
@@ -524,23 +726,81 @@ function formatTime(totalSeconds) {
 }
 
 function showAiResponse(title, text) {
-  const panel = document.getElementById('aiResponsePanel');
-  const body = document.getElementById('aiResponseText');
-  const loading = document.getElementById('aiLoading');
-  const close = document.getElementById('aiResponseClose');
-  const hdr = document.getElementById('aiResponseTitle');
+  const panel      = document.getElementById('aiResponsePanel');
+  const body       = document.getElementById('aiResponseText');
+  const loading    = document.getElementById('aiLoading');
+  const disclaimer = document.getElementById('hintDisclaimer');
+  const hdr        = document.getElementById('aiResponseTitle');
   if (!panel || !body || !loading || !hdr) return;
 
   hdr.textContent = title || 'AI Response';
   loading.style.display = 'none';
   body.style.display = 'block';
   body.textContent = text || '';
+  if (disclaimer) disclaimer.style.display = 'none';
   panel.style.display = 'block';
 
-  if (close) {
-    close.onclick = () => {
-      panel.style.display = 'none';
-    };
+  document.getElementById('aiResponseClose').onclick = () => { panel.style.display = 'none'; };
+}
+
+function showAiLoading(title) {
+  const panel      = document.getElementById('aiResponsePanel');
+  const body       = document.getElementById('aiResponseText');
+  const loading    = document.getElementById('aiLoading');
+  const disclaimer = document.getElementById('hintDisclaimer');
+  const hdr        = document.getElementById('aiResponseTitle');
+  if (!panel) return;
+
+  hdr.textContent = title || 'Generating hint…';
+  loading.style.display = 'flex';
+  body.style.display = 'none';
+  if (disclaimer) disclaimer.style.display = 'none';
+  panel.style.display = 'block';
+
+  document.getElementById('aiResponseClose').onclick = () => { panel.style.display = 'none'; };
+}
+
+function showHintResponse(title, text) {
+  const panel      = document.getElementById('aiResponsePanel');
+  const body       = document.getElementById('aiResponseText');
+  const loading    = document.getElementById('aiLoading');
+  const disclaimer = document.getElementById('hintDisclaimer');
+  const hdr        = document.getElementById('aiResponseTitle');
+  if (!panel || !body || !loading || !hdr) return;
+
+  hdr.textContent = title || 'Hint';
+  loading.style.display = 'none';
+  body.style.display = 'block';
+  body.textContent = text || '';
+  if (disclaimer) disclaimer.style.display = 'flex';
+  panel.style.display = 'block';
+
+  document.getElementById('aiResponseClose').onclick = () => { panel.style.display = 'none'; };
+}
+
+async function fetchAiHint(hintNumber) {
+  const code        = monacoEditor ? monacoEditor.getValue() : '';
+  const language    = languageSelect ? languageSelect.value : 'cpp';
+  let elapsedSec    = aiAccumulated;
+  if (aiRunningStart) elapsedSec += Math.floor((Date.now() - aiRunningStart) / 1000);
+
+  const label = `Hint ${hintNumber} of 3`;
+  showAiLoading(label);
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/hint`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(window.getAuthHeaders ? window.getAuthHeaders() : {}) },
+      body: JSON.stringify({ problemId, hintNumber, code, language, elapsedSeconds: elapsedSec })
+    });
+    const data = await res.json();
+    if (data.hint) {
+      showHintResponse(label, data.hint);
+    } else {
+      showHintResponse(label, 'Could not generate hint. Please try again.');
+    }
+  } catch {
+    showHintResponse(label, 'Network error. Check your connection and try again.');
   }
 }
 
@@ -587,10 +847,10 @@ function initAiTimer() {
           btn.disabled = false;
           if (timerSpan) timerSpan.textContent = 'unlocked';
 
-          // Auto-open AI Assist only when visible
+          // Notify user hint is available (don't auto-fetch, let them click)
           if (document.visibilityState === 'visible') {
-            const hintText = (problem.hints && problem.hints[idx]) || `Hint ${idx + 1} is now available.`;
-            showAiResponse(`Hint ${idx + 1}`, hintText);
+            btn.classList.add('pulse-unlock');
+            setTimeout(() => btn.classList.remove('pulse-unlock'), 3000);
           }
         }
       } else {
@@ -641,8 +901,7 @@ function initAiTimer() {
     if (!btn) return;
     btn.addEventListener('click', () => {
       if (btn.classList.contains('locked')) return;
-      const hintText = (problem.hints && problem.hints[idx]) || `Here's a suggestion for this problem (Hint ${idx + 1}).`;
-      showAiResponse(`Hint ${idx + 1}`, hintText);
+      fetchAiHint(idx + 1);
       btn.classList.remove('unlocked');
       btn.classList.add('used');
     });
@@ -751,3 +1010,146 @@ function initSplitter() {
 document.addEventListener('DOMContentLoaded', initSplitter);
 // also attempt init immediately (script is loaded after DOM but be safe)
 initSplitter();
+
+/* ── Confetti celebration ── */
+function launchCelebration() {
+  // Canvas-based confetti
+  const canvas = document.createElement('canvas');
+  canvas.className = 'confetti-canvas';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const COLORS = ['#22c55e','#86efac','#fbbf24','#f97316','#60a5fa','#c084fc','#f472b6','#34d399','#facc15','#fb923c'];
+  const SHAPES = ['rect', 'circle', 'ribbon'];
+
+  const particles = Array.from({ length: 160 }, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * 200,
+    w: 6 + Math.random() * 12,
+    h: 4 + Math.random() * 8,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+    vy: 2.5 + Math.random() * 3.5,
+    vx: (Math.random() - 0.5) * 3,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.18,
+    sway: Math.random() * Math.PI * 2,
+    swayV: 0.03 + Math.random() * 0.04,
+    swayAmp: 18 + Math.random() * 30,
+    opacity: 1,
+  }));
+
+  let frame = 0;
+  let animId;
+
+  function drawParticle(p) {
+    ctx.save();
+    ctx.globalAlpha = p.opacity;
+    ctx.fillStyle = p.color;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    if (p.shape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.shape === 'ribbon') {
+      ctx.fillRect(-p.w / 2, -p.h / 4, p.w, p.h / 2);
+    } else {
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    }
+    ctx.restore();
+  }
+
+  function animateConfetti() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+
+    let alive = 0;
+    for (const p of particles) {
+      p.sway += p.swayV;
+      p.x += p.vx + Math.sin(p.sway) * 0.8;
+      p.y += p.vy;
+      p.rot += p.rotV;
+      if (frame > 120) p.opacity -= 0.008;
+      if (p.y < canvas.height && p.opacity > 0) {
+        alive++;
+        drawParticle(p);
+      }
+    }
+
+    if (alive > 0 || frame < 120) {
+      animId = requestAnimationFrame(animateConfetti);
+    } else {
+      canvas.remove();
+    }
+  }
+  animateConfetti();
+
+  // Party popper emojis from corners
+  const poppers = ['🎉','🎊','🥳','🎉','🎊','✨'];
+  const positions = [
+    { left: '5%',  top: '15%' },
+    { right: '5%', top: '15%' },
+    { left: '5%',  bottom: '25%' },
+    { right: '5%', bottom: '25%' },
+    { left: '48%', top: '8%' },
+    { right: '48%', bottom: '8%' },
+  ];
+  positions.forEach((pos, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'popper-emoji';
+      Object.assign(el.style, pos);
+      el.textContent = poppers[i % poppers.length];
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2200);
+    }, i * 80);
+  });
+
+  // Floating stars
+  const starEmojis = ['⭐','✨','🌟','💫','⭐','✨'];
+  starEmojis.forEach((s, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'star-burst';
+      el.style.left = (15 + Math.random() * 70) + '%';
+      el.style.top  = (20 + Math.random() * 50) + '%';
+      el.textContent = s;
+      el.style.animationDelay = '0s';
+      el.style.animationDuration = (0.6 + Math.random() * 0.5) + 's';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }, 80 + i * 120);
+  });
+
+  // Success banner overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'success-overlay';
+  const banner = document.createElement('div');
+  banner.className = 'success-banner';
+  banner.innerHTML = `
+    <span class="success-banner-icon">🎉</span>
+    <div class="success-banner-title">All Tests Passed!</div>
+    <div class="success-banner-sub">Your solution is correct. Nicely done!</div>
+    <button class="success-banner-dismiss">Continue</button>
+  `;
+  overlay.appendChild(banner);
+  document.body.appendChild(overlay);
+
+  function dismiss() {
+    banner.classList.add('hide');
+    setTimeout(() => {
+      overlay.remove();
+      cancelAnimationFrame(animId);
+      canvas.remove();
+    }, 420);
+  }
+
+  banner.querySelector('.success-banner-dismiss').addEventListener('click', dismiss);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(dismiss, 5000);
+}

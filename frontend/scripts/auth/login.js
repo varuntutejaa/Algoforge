@@ -26,7 +26,7 @@
         firebaseUid: user.firebaseUid || "",
         name: user.name || user.displayName || "",
         email: user.email || "",
-        photoURL: user.photoURL || ""
+        photoURL: user.photoURL || user.profilePicture || ""
       }));
     }
   }
