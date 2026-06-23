@@ -985,6 +985,40 @@ app.get('/api/leetcode-contests', async (req, res) => {
   }
 });
 
+let hrContestsCache = null;
+let hrCacheTime = 0;
+app.get('/api/hackerrank-contests', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (hrContestsCache && now - hrCacheTime < 10 * 60 * 1000) {
+      return res.json(hrContestsCache);
+    }
+    const apiRes = await fetch('https://www.hackerrank.com/rest/contests/upcoming?offset=0&limit=100', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlgoForge/1.0)' }
+    });
+    const data = await apiRes.json();
+    const MAX_DURATION_DAYS = 30;
+    const contests = (data.models || [])
+      .filter(c =>
+        !c.ended &&
+        (c.epoch_endtime - c.epoch_starttime) < MAX_DURATION_DAYS * 86400 // exclude permanent contests
+      )
+      .map(c => ({
+        id:           c.id,
+        slug:         c.slug,
+        title:        c.name,
+        startTime:    c.epoch_starttime * 1000,
+        endTime:      c.epoch_endtime * 1000,
+        durationMins: Math.round((c.epoch_endtime - c.epoch_starttime) / 60),
+      }));
+    hrContestsCache = { contests };
+    hrCacheTime = now;
+    res.json(hrContestsCache);
+  } catch (err) {
+    res.status(500).json({ contests: [], error: err.message });
+  }
+});
+
 let atContestsCache = null;
 let atCacheTime = 0;
 app.get('/api/atcoder-contests', async (req, res) => {
@@ -1781,6 +1815,10 @@ app.listen(8000, () => {
         try {
             await fetch('http://localhost:8000/api/atcoder-contests');
             console.log('✅ AtCoder cache warmed');
+        } catch {}
+        try {
+            await fetch('http://localhost:8000/api/hackerrank-contests');
+            console.log('✅ HackerRank cache warmed');
         } catch {}
     }, 100);
 });

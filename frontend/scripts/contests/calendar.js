@@ -7,13 +7,14 @@
   const LC_LOGO = `<img src="https://leetcode.com/favicon-192x192.png" class="cf-logo-icon lc-logo-icon" alt="LC" onerror="this.style.display='none'">`;
   const CC_LOGO = `<img src="https://www.codechef.com/favicon.ico" class="cf-logo-icon cc-logo-icon" alt="CC" onerror="this.style.display='none'">`;
   const AT_LOGO = `<img src="https://img.atcoder.jp/assets/favicon.png" class="cf-logo-icon at-logo-icon" alt="AT" onerror="this.style.display='none'">`;
+  const HR_LOGO = `<img src="https://www.hackerrank.com/favicon.ico" class="cf-logo-icon hr-logo-icon" alt="HR" onerror="this.style.display='none'">`;
 
   let view = 'month';
   let cursor = new Date();
   let miniCursor = new Date();
   let allContests = [];
   let selectedDate = new Date();
-  const activePlatforms = new Set(['algoforge', 'codeforces', 'leetcode', 'codechef', 'atcoder']);
+  const activePlatforms = new Set(['algoforge', 'codeforces', 'leetcode', 'codechef', 'atcoder', 'hackerrank']);
 
   function visibleContests() {
     return allContests.filter(c => activePlatforms.has(c.source || 'algoforge'));
@@ -79,6 +80,7 @@
       fetchLeetCodeContests().then(rerenderAll),
       fetchCodeChefContests().then(rerenderAll),
       fetchAtCoderContests().then(rerenderAll),
+      fetchHackerRankContests().then(rerenderAll),
     ];
     await Promise.allSettled(externalFetches);
   }
@@ -191,6 +193,31 @@
     } catch {}
   }
 
+  async function fetchHackerRankContests() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/hackerrank-contests`);
+      const data = await res.json();
+      const existing = new Set(allContests.map(c => c.code));
+      (data.contests || []).forEach(c => {
+        const code = `hr-${c.slug}`;
+        if (existing.has(code)) return;
+        existing.add(code);
+        allContests.push({
+          source: 'hackerrank',
+          code,
+          hrSlug: c.slug,
+          title: c.title,
+          description: `${c.durationMins} min · HackerRank`,
+          startsAt: new Date(c.startTime).toISOString(),
+          endsAt:   new Date(c.endTime).toISOString(),
+          problemCount: '—',
+          participantCount: '—',
+          createdByName: 'HackerRank',
+        });
+      });
+    } catch {}
+  }
+
   // ---- Helpers ----
   function esc(v) {
     return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -207,8 +234,9 @@
   function isLc(c) { return c.source === 'leetcode'; }
   function isCc(c) { return c.source === 'codechef'; }
   function isAt(c) { return c.source === 'atcoder'; }
-  function srcCls(c) { return isCf(c) ? ' cf' : isLc(c) ? ' lc' : isCc(c) ? ' cc' : isAt(c) ? ' at' : ''; }
-  function srcLogo(c) { return isCf(c) ? CF_LOGO : isLc(c) ? LC_LOGO : isCc(c) ? CC_LOGO : isAt(c) ? AT_LOGO : ''; }
+  function isHr(c) { return c.source === 'hackerrank'; }
+  function srcCls(c) { return isCf(c) ? ' cf' : isLc(c) ? ' lc' : isCc(c) ? ' cc' : isAt(c) ? ' at' : isHr(c) ? ' hr' : ''; }
+  function srcLogo(c) { return isCf(c) ? CF_LOGO : isLc(c) ? LC_LOGO : isCc(c) ? CC_LOGO : isAt(c) ? AT_LOGO : isHr(c) ? HR_LOGO : ''; }
 
   function fmtTime(d) { return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   function fmtDate(d) { return new Date(d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
@@ -624,6 +652,9 @@
     } else if (isAt(contest)) {
       contestUrl = `https://atcoder.jp/contests/${contest.atId}`;
       details = `AtCoder contest\n${contestUrl}`;
+    } else if (isHr(contest)) {
+      contestUrl = `https://www.hackerrank.com/contests/${contest.hrSlug}`;
+      details = `HackerRank contest\n${contestUrl}`;
     } else {
       contestUrl = `${API_BASE_URL.replace('localhost:8000', 'algoforge-1-mbk5.onrender.com')}/contests.html`;
       details = `AlgoForge contest · Code: ${contest.code}\n${contestUrl}`;
@@ -652,7 +683,8 @@
     const lc = isLc(contest);
     const cc = isCc(contest);
     const at = isAt(contest);
-    const isExternal = cf || lc || cc || at;
+    const hr = isHr(contest);
+    const isExternal = cf || lc || cc || at || hr;
 
     let actionBtn;
     if (cf) {
@@ -664,6 +696,8 @@
       actionBtn = `<a class="ep-btn ep-btn-cc" href="https://www.codechef.com/${contest.ccCode}" target="_blank" rel="noopener">${CC_LOGO} Open on CodeChef ↗</a>`;
     } else if (at) {
       actionBtn = `<a class="ep-btn ep-btn-at" href="https://atcoder.jp/contests/${contest.atId}" target="_blank" rel="noopener">${AT_LOGO} Open on AtCoder ↗</a>`;
+    } else if (hr) {
+      actionBtn = `<a class="ep-btn ep-btn-hr" href="https://www.hackerrank.com/contests/${contest.hrSlug}" target="_blank" rel="noopener">${HR_LOGO} Open on HackerRank ↗</a>`;
     } else if (status === 'active') {
       actionBtn = `<a class="ep-btn ep-btn-primary" href="contest-editor.html?code=${esc(contest.code)}">Enter Contest</a>`;
     } else if (status === 'upcoming') {
@@ -677,6 +711,7 @@
     if (lc) sourceBadge = `<span class="ep-lc-badge">${LC_LOGO} LeetCode</span>`;
     if (cc) sourceBadge = `<span class="ep-cc-badge">${CC_LOGO} CodeChef</span>`;
     if (at) sourceBadge = `<span class="ep-at-badge">${AT_LOGO} AtCoder</span>`;
+    if (hr) sourceBadge = `<span class="ep-hr-badge">${HR_LOGO} HackerRank</span>`;
 
     document.getElementById('eventPanelInner').innerHTML = `
       <div class="ep-top-row">
