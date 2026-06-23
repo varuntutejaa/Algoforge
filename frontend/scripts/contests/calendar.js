@@ -585,7 +585,7 @@
 
     let contestUrl, details;
     if (isCf(contest)) {
-      contestUrl = `https://codeforces.com/contest/${contest.cfId}`;
+      contestUrl = contest.cfId ? `https://codeforces.com/contest/${contest.cfId}` : 'https://codeforces.com/contests';
       details = `Codeforces contest\n${contestUrl}`;
     } else if (isLc(contest)) {
       contestUrl = `https://leetcode.com/contest/${contest.lcSlug}`;
@@ -624,7 +624,8 @@
 
     let actionBtn;
     if (cf) {
-      actionBtn = `<a class="ep-btn ep-btn-cf" href="https://codeforces.com/contest/${contest.cfId}" target="_blank" rel="noopener">${CF_LOGO} Open on Codeforces ↗</a>`;
+      const cfUrl = contest.cfId ? `https://codeforces.com/contest/${contest.cfId}` : 'https://codeforces.com/contests';
+      actionBtn = `<a class="ep-btn ep-btn-cf" href="${cfUrl}" target="_blank" rel="noopener">${CF_LOGO} Open on Codeforces ↗</a>`;
     } else if (lc) {
       actionBtn = `<a class="ep-btn ep-btn-lc" href="https://leetcode.com/contest/${contest.lcSlug}" target="_blank" rel="noopener">${LC_LOGO} Open on LeetCode ↗</a>`;
     } else if (cc) {
