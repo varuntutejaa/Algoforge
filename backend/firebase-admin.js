@@ -14,8 +14,8 @@ try {
     if (projectId && clientEmail && privateKey) {
       initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
     } else {
-      // Fallback: look for service account JSON file in the project root
-      const jsonPath = path.resolve(__dirname, "../algoforge-d0e7e-firebase-adminsdk-fbsvc-e80f171fc5.json");
+      // Fallback: look for service account JSON file in the backend directory
+      const jsonPath = path.resolve(__dirname, "algoforge-d0e7e-firebase-adminsdk-fbsvc-e80f171fc5.json");
       if (!fs.existsSync(jsonPath)) throw new Error("Missing Firebase Admin environment variables");
       const serviceAccount = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
       initializeApp({ credential: cert(serviceAccount) });
@@ -23,10 +23,10 @@ try {
   }
 
   isInitialized = true;
-  console.log("✅ Firebase Admin SDK initialized successfully");
+  console.log("Firebase Admin SDK initialized successfully");
 } catch (error) {
   initError = error.message;
-  console.error("❌ Firebase Admin SDK initialization failed:", error.message);
+  console.error(" Firebase Admin SDK initialization failed:", error.message);
 }
 
 module.exports = { isInitialized, initError };

@@ -1,0 +1,29 @@
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+/* Tailwind (kept for DiffBadge utility classes) */
+@import "tailwindcss";
+
+/* ── Original component CSS files ── */
+@import "./nav.css";
+@import "./auth.css";
+@import "./home.css";
+@import "./problems.css";
+@import "./editor.css";
+@import "./dashboard.css";
+@import "./submissions.css";
+@import "./contest.css";
+@import "./contest-editor.css";
+@import "./contest-results.css";
+@import "./calendar.css";
+
+/* ── Reset body overflow so calendar.css doesn't lock all pages ── */
+body { overflow: auto; }
+
+/* ── Monaco editor full-height utility ─── */
+.code-editor-wrap { flex: 1; min-height: 0; overflow: hidden; }
+.code-editor-wrap > section { height: 100% !important; }
+
+/* ── Week/day view min-height (calendar) ─── */
+.week-col { min-height: calc(24 * 60px); position: relative; }

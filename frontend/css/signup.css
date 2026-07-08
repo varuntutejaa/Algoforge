@@ -1,8 +1,0 @@
-@import url('login.css');
-
-/* signup-only overrides */
-.page { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
-
-@media (max-width: 420px) {
-  .form-card { padding: 28px 18px; }
-}

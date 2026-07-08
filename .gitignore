@@ -15,4 +15,7 @@ npm-debug.log*
 
 # build files
 dist/
-build/firebase-adminsdk*.json
+
+# secrets
+*firebase-adminsdk*.json
+.venv/
