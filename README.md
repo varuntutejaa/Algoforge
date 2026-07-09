@@ -1,13 +1,14 @@
 <div align="center">
 
-<img src="frontend/assets/algoforge_favicon_themed.svg" width="120" alt="AlgoForge logo" />
+<img src="frontend/public/assets/algoforge_favicon_themed.svg" width="120" alt="AlgoForge logo" />
 
 # AlgoForge
 
 **A competitive programming platform built for real contest experience.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-algoforge--1--mbk5.onrender.com-4f8ef7?style=flat-square&logo=render&logoColor=white)](https://algoforge-lwo9.vercel.app/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-djpb60zs17m9t.cloudfront.net-4f8ef7?style=flat-square&logo=amazonaws&logoColor=white)](https://djpb60zs17m9t.cloudfront.net)
+[![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?style=flat-square&logo=firebase&logoColor=black)](https://firebase.google.com)
 
@@ -24,13 +25,13 @@ AlgoForge is a LeetCode-style platform where you can solve algorithmic problems,
 ## Features
 
 ```
-Problem solving       — Monaco editor, C / C++ / Java / JavaScript
-Contest arena         — Live timer + progress bar, real-time leaderboard
-Scoring system        — +100 per accepted, −10 per wrong attempt
-AI Assist             — Time-locked hints + code review (GPT-powered)
-Auto-save             — Code persisted per problem per language
-Dashboard             — Heatmap, streaks, difficulty & topic breakdown
-Auth                  — Email/password + Google OAuth via Firebase
+Problem solving       — Monaco editor, C / C++ / Java / JavaScript / Python
+Contest arena          — Live timer + progress bar, real-time leaderboard
+Scoring system         — +100 per accepted, −10 per wrong attempt
+AI Assist              — Time-locked hints + code review (Groq / Llama 3.3 70B)
+Auto-save              — Code persisted per problem per language
+Dashboard               — Heatmap, streaks, difficulty & topic breakdown
+Auth                    — Email/password + Google OAuth via Firebase
 ```
 
 ---
@@ -39,14 +40,14 @@ Auth                  — Email/password + Google OAuth via Firebase
 
 | Layer      | Technology                                      |
 |------------|-------------------------------------------------|
-| Frontend   | Vanilla HTML · CSS · JavaScript                 |
-| Editor     | Monaco Editor 0.52                              |
+| Frontend   | React 19 · TypeScript · Vite · Tailwind CSS     |
+| Editor     | Monaco Editor                                   |
 | Backend    | Node.js · Express                               |
-| Database   | MongoDB (Mongoose)                              |
+| Database   | MongoDB Atlas (Mongoose)                        |
 | Auth       | Firebase Authentication (Admin SDK v14)         |
 | Judge      | Judge0 API (code execution)                     |
-| AI         | Anthropic Claude API                            |
-| Deploy     | Render                                          |
+| AI         | Groq API (Llama 3.3 70B)                        |
+| Deploy     | AWS — EC2 (API) · CloudFront + S3 (frontend)    |
 
 ---
 
@@ -55,22 +56,26 @@ Auth                  — Email/password + Google OAuth via Firebase
 ```
 AlgoForge/
 ├── backend/
-│   ├── models/          # Mongoose schemas (User, Problem, Contest, Submission)
-│   ├── routes/          # Express routers (auth, problems, contests, profile)
-│   ├── middleware/       # Firebase token verification
-│   ├── utils/           # Profile helpers
+│   ├── config/           # DB connection
+│   ├── models/            # Mongoose schemas (User, Problem, Contest, Submission, UserCode)
+│   ├── routes/            # Express routers (auth, problems, contests, code, submissions, profile, ai, health)
+│   ├── services/          # Judge0 runner glue, problem formatting
+│   ├── middleware/        # Firebase token verification
+│   ├── utils/             # Profile helpers
 │   ├── firebase-admin.js
-│   └── server.js        # Entry point
+│   └── server.js          # Entry point
 │
 └── frontend/
-    ├── css/             # Per-page stylesheets
-    ├── scripts/
-    │   ├── auth/        # login.js, signup.js, fpass.js
-    │   ├── contests/    # contest-editor.js, contests.js, contest-results.js
-    │   ├── dashboard/   # dashboard.js, submissions.js
-    │   ├── design/      # nav.js, toast.js, script.js
-    │   └── problem/     # editor.js, problems.js
-    └── *.html           # index, login, signup, problems, editor, contests, dashboard
+    ├── public/            # Static assets (favicons, images)
+    └── src/
+        ├── api/           # fetch wrappers per resource
+        ├── components/    # Layout + shared UI
+        ├── config/        # API base URL, Firebase web config
+        ├── context/       # AuthContext
+        ├── hooks/         # useToast, etc.
+        ├── pages/         # Route-level views (Dashboard, Editor, Contests, ...)
+        ├── styles/        # Per-page CSS
+        └── types/         # Shared TS types
 ```
 
 ---
@@ -88,7 +93,7 @@ Leaderboard is sorted by **total score** descending. Tiebreaker: fewer wrong att
 
 ## Running Locally
 
-**Prerequisites:** Node.js 18+, MongoDB Atlas URI, Firebase project, Judge0 API key
+**Prerequisites:** Node.js 20+, MongoDB Atlas URI, Firebase project, Judge0 API key, Groq API key
 
 ```bash
 # 1. Clone
@@ -99,26 +104,35 @@ cd Algoforge
 cd backend
 npm install
 cp .env.example .env   # fill in your keys
-node server.js
+node server.js         # runs on :8000
 
 # 3. Frontend
-# Open frontend/index.html in a browser, or serve with any static server:
-npx serve frontend
+cd ../frontend
+npm install
+npm run dev             # runs on :5173, calls http://localhost:8000 directly
 ```
 
-### Required environment variables
+### Required backend environment variables (`backend/.env`)
 
 ```env
-MONGODB_URI=
+MONGO_URI=
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
+JUDGE0_URL=
 JUDGE0_API_KEY=
-ANTHROPIC_API_KEY=
-PORT=3000
+GROQ_API_KEY=
 ```
 
-Update `frontend/scripts/auth/firebase-config.js` with your Firebase web app config and `frontend/scripts/config.js` with your backend URL.
+The frontend's Firebase web config lives in `frontend/src/config/firebase.ts`, and the API base URL (local vs. production) is in `frontend/src/config/api.ts`.
+
+---
+
+## Deployment
+
+- **Frontend** — built with `vite build`, served from an S3 bucket behind a CloudFront distribution (HTTPS via CloudFront's default certificate; SPA routing handled via custom 403/404 → `index.html` responses).
+- **Backend** — runs on a single EC2 instance under PM2, behind an nginx reverse proxy, fronted by a second CloudFront distribution for HTTPS termination.
+- **Database** — MongoDB Atlas, unchanged regardless of where the backend runs.
 
 ---
 

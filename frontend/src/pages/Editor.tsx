@@ -2,14 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
-import { fetchProblem, submitCode, fetchSavedCode, saveCode, fetchAiHint, fetchCodeReview } from '@/api/problems';
+import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview } from '@/api/problems';
 import DiffBadge from '@/components/ui/DiffBadge';
 import { IconArrowLeft, IconCheck, IconX, IconLock, IconBulb, IconSparkle, IconAlertCircle, IconPlay, IconSend, IconRotateCcw, IconChevronDown } from '@/components/ui/Icons';
 import type { ProblemDetail, Language } from '@/types/problem';
 
 const MONACO_LANG: Record<Language, string> = { c:'c', cpp:'cpp', java:'java', js:'javascript', python:'python' };
 const MAX_SOLUTIONS = 5;
-const AUTO_SAVE_MS = 5000;
 const HINT_UNLOCK_SEC = [4*60, 9*60, 14*60];
 
 function codeKey(pid: string, lang: Language, slot: number) { return slot===0 ? `af-code-${pid}-${lang}` : `af-code-${pid}-${lang}-s${slot}`; }
@@ -120,8 +119,6 @@ export default function Editor() {
   const [code, setCode] = useState('');
   const [monacoReady, setMonacoReady] = useState(false);
   const monacoRef = useRef<any>(null);
-  const lastSavedRef = useRef('');
-  const hasUnsavedRef = useRef(false);
   const isSwitchingRef = useRef(false);
 
   const [slotCount, setSlotCount] = useState(1);
@@ -150,7 +147,6 @@ export default function Editor() {
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartW = useRef(0);
-  const autoSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function getBoilerplate(lang: Language) { return problem?.boilerplate[lang] || problem?.boilerplate.cpp || ''; }
   function localLoad(lang: Language, slot = activeSlot) { return lsGet(codeKey(problemId, lang, slot)); }
@@ -171,13 +167,9 @@ export default function Editor() {
 
   useEffect(() => {
     if (!problem || !monacoReady) return;
-    (async () => {
-      const local = localLoad(language, 0);
-      if (local) { setCode(local); return; }
-      const remote = await fetchSavedCode(problemId, language, getHeaders());
-      const value = remote ?? getBoilerplate(language);
-      setCode(value); localSave(value, language, 0);
-    })();
+    const local = localLoad(language, 0);
+    const value = local ?? getBoilerplate(language);
+    setCode(value); localSave(value, language, 0);
   }, [problem, monacoReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -201,16 +193,6 @@ export default function Editor() {
     window.addEventListener('beforeunload', stopTimer);
     return () => { stopTimer(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('beforeunload', stopTimer); };
   }, [problem, problemId]);
-
-  useEffect(() => {
-    autoSaveTimer.current = setInterval(async () => {
-      if (!hasUnsavedRef.current || !monacoRef.current || !problem || !user?.id) return;
-      const src = monacoRef.current.getValue();
-      await saveCode({ problemId, language, sourceCode: src, userId: user.id }, getHeaders());
-      lastSavedRef.current = src; hasUnsavedRef.current = false;
-    }, AUTO_SAVE_MS);
-    return () => { if (autoSaveTimer.current) clearInterval(autoSaveTimer.current); };
-  }, [problem, language, problemId, user, getHeaders]);
 
   useEffect(() => {
     const splitter = splitterRef.current, left = leftPanelRef.current;
@@ -238,30 +220,27 @@ export default function Editor() {
     return () => { splitter.removeEventListener('mousedown', onDown); window.removeEventListener('mousemove', onMoveGlobal); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  async function handleLanguageChange(newLang: Language) {
+  function handleLanguageChange(newLang: Language) {
     if (!monacoRef.current || !problem) return;
     isSwitchingRef.current = true;
     const prevCode = monacoRef.current.getValue();
     localSave(prevCode, language);
-    if (user?.id && prevCode !== lastSavedRef.current) await saveCode({ problemId, language, sourceCode: prevCode, userId: user.id }, getHeaders());
     setLanguage(newLang);
-    const local = localLoad(newLang);
-    const remote = local ? null : await fetchSavedCode(problemId, newLang, getHeaders());
-    const val = local ?? remote ?? getBoilerplate(newLang);
-    setCode(val); lastSavedRef.current = val; hasUnsavedRef.current = false; isSwitchingRef.current = false;
+    const val = localLoad(newLang) ?? getBoilerplate(newLang);
+    setCode(val); isSwitchingRef.current = false;
   }
 
-  async function switchSlot(idx: number) {
+  function switchSlot(idx: number) {
     if (!monacoRef.current) return;
     localSave(monacoRef.current.getValue(), language); setActiveSlot(idx);
     const val = localLoad(language, idx) ?? getBoilerplate(language);
-    setCode(val); lastSavedRef.current = val; hasUnsavedRef.current = false;
+    setCode(val);
   }
   function addSlot() {
     if (slotCount >= MAX_SOLUTIONS || !monacoRef.current) return;
     localSave(monacoRef.current.getValue(), language);
     const newIdx = slotCount; setSlotCount(slotCount+1); lsSet(slotCountKey(problemId), String(slotCount+1));
-    setActiveSlot(newIdx); const val = getBoilerplate(language); setCode(val); lastSavedRef.current = val; hasUnsavedRef.current = false;
+    setActiveSlot(newIdx); const val = getBoilerplate(language); setCode(val);
   }
   function removeSlot(idx: number) {
     if (idx <= 0 || slotCount <= 1) return;
@@ -277,7 +256,6 @@ export default function Editor() {
   async function execute(action: 'run'|'submit') {
     if (!monacoRef.current || !problem) return;
     const src = monacoRef.current.getValue();
-    if (action==='submit') await saveCode({ problemId, language, sourceCode: src, userId: user?.id }, getHeaders());
     action==='run' ? setRunning(true) : setSubmitting(true); setResults(null);
     try {
       const res = await submitCode({ problemId, language, sourceCode: src, userId: user?.id, action }, getHeaders());
@@ -434,7 +412,7 @@ export default function Editor() {
             }}
             onChange={val => {
               if (isSwitchingRef.current) return;
-              const v = val || ''; hasUnsavedRef.current = v !== lastSavedRef.current;
+              const v = val || '';
               setTimeout(() => localSave(v, language), 400);
             }}
           />

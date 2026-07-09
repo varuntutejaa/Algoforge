@@ -1,14 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/ui/ProtectedRoute';
-
-// Public pages
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
-
-// Protected pages
 import Problems from './pages/Problems';
 import Editor from './pages/Editor';
 import Calendar from './pages/Calendar';
@@ -18,7 +14,6 @@ import ContestResults from './pages/ContestResults';
 import Dashboard from './pages/Dashboard';
 import Submissions from './pages/Submissions';
 
-// Pages that show the Navbar vs full-screen pages (editor, contest-editor)
 const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor'];
 
 function Layout({ children }: { children: React.ReactNode }) {

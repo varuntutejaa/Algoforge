@@ -57,6 +57,14 @@ router.get('/:id', async (req, res) => {
 // Create a new problem (admin)
 router.post('/', async (req, res) => {
     try {
+        const adminKey = process.env.ADMIN_API_KEY;
+        if (!adminKey || req.headers['x-admin-key'] !== adminKey) {
+            return res.status(403).json({
+                success: false,
+                message: "Forbidden"
+            });
+        }
+
         const {
             id,
             title,

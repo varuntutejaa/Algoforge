@@ -11,14 +11,29 @@ const externalContestsRoutes = require('./routes/externalContests');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
-const codeRoutes = require('./routes/code');
 const problemsRoutes = require('./routes/problems');
 const aiRoutes = require('./routes/ai');
 const submissionsRoutes = require('./routes/submissions');
 
 const app = express();
 app.use(compression());
-app.use(cors());
+
+const defaultOrigins = [
+    'https://djpb60zs17m9t.cloudfront.net',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+];
+const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+    : defaultOrigins;
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow non-browser requests (no Origin header) and configured origins
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    }
+}));
 app.use(express.json());
 
 connectWithRetry();
@@ -29,7 +44,6 @@ app.use('/api', externalContestsRoutes);
 app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/profile', profileRoutes);
-app.use('/code', codeRoutes);
 app.use('/problems', problemsRoutes);
 app.use('/api', aiRoutes);
 app.use('/submit-code', optionalAuth, submissionsRoutes);

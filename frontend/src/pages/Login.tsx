@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, Google
 import { auth } from '@/config/firebase';
 import { backendAuth, persistUser } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import { IconEye, IconEyeOff } from '@/components/ui/Icons';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -105,8 +106,8 @@ export default function Login() {
                 <input type={showPw ? 'text' : 'password'} className="field-input" placeholder="••••••••"
                   value={password} onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: undefined })); }}
                   autoComplete="current-password" />
-                <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)}>
-                  {showPw ? '🙈' : '👁'}
+                <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'}>
+                  {showPw ? <IconEyeOff width={18} height={18} /> : <IconEye width={18} height={18} />}
                 </button>
               </div>
               {errors.password && <p className="field-error">{errors.password}</p>}

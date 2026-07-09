@@ -1,9 +1,21 @@
 // Groq-backed AI code review + progressive hints.
 const express = require('express');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const Problem = require('../models/Problem');
+const { verifyFirebaseToken } = require('../middleware/auth');
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+});
+
+router.use(verifyFirebaseToken, aiLimiter);
 
 async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTokens }) {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {

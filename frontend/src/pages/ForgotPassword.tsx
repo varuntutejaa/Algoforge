@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { useToast } from '@/hooks/useToast';
+import { API_BASE_URL } from '@/config/api';
 
 export default function ForgotPassword() {
   const toast = useToast();
@@ -15,6 +16,17 @@ export default function ForgotPassword() {
     if (!email.trim()) { toast.error('Email is required'); return; }
     setLoading(true);
     try {
+      const checkRes = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const checkData = await checkRes.json();
+      if (!checkData.exists) {
+        toast.error('No account found with this email');
+        return;
+      }
+
       await sendPasswordResetEmail(auth, email.trim());
       setSent(true);
     } catch (err: any) {

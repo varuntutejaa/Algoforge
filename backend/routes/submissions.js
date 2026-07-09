@@ -1,13 +1,21 @@
 const express = require('express');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const Problem = require('../models/Problem');
 const Submission = require('../models/Submission');
-const UserCode = require('../models/UserCode');
 const { getVerdict, getSubmissionMetrics, updateStreak } = require('../utils/profileHelpers');
 const { formatProblem, getDailyProblemId } = require('../services/problems');
 const { languageIds, runJudge0Submission } = require('../services/judge0');
 
-router.post('/', async (req, res) => {
+const submitLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+});
+
+router.post('/', submitLimiter, async (req, res) => {
     try {
         const { problemId = "two-sum", language, sourceCode, action = "submit" } = req.body;
         const isSubmit = action === "submit";
@@ -84,18 +92,6 @@ router.post('/', async (req, res) => {
             }
 
             await user.save();
-
-            await UserCode.findOneAndUpdate(
-                { userId: user._id, problemId: problem.id, language },
-                {
-                    userId: user._id,
-                    problemId: problem.id,
-                    language,
-                    sourceCode,
-                    updatedAt: new Date()
-                },
-                { upsert: true }
-            );
         }
 
         res.json({

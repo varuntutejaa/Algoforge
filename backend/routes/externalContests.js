@@ -8,6 +8,8 @@ const PAST_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // show contests that ended wit
 
 let cfContestsCache = null;
 let cfCacheTime = 0;
+
+// codeforcves.com API returns all contests (including past) in one call, so we cache it for 5 minutes.
 router.get('/codeforces-contests', async (req, res) => {
   try {
     const now = Date.now();
@@ -32,6 +34,7 @@ router.get('/codeforces-contests', async (req, res) => {
   }
 });
 
+// codechef.com API returns all contests (including past) in one call, so we cache it for 10 minutes.
 let ccContestsCache = null;
 let ccCacheTime = 0;
 router.get('/codechef-contests', async (req, res) => {
@@ -64,6 +67,8 @@ router.get('/codechef-contests', async (req, res) => {
   }
 });
 
+
+// leetcode.com GraphQL API returns all contests (including past) in one call, so we cache it for 10 minutes.
 let lcContestsCache = null;
 let lcCacheTime = 0;
 router.get('/leetcode-contests', async (req, res) => {
@@ -97,6 +102,8 @@ router.get('/leetcode-contests', async (req, res) => {
     res.status(500).json({ contests: [], error: err.message });
   }
 });
+
+// hackerrank.com API returns upcoming and past contests in separate calls, so we cache them for 10 minutes.
 
 let hrContestsCache = null;
 let hrCacheTime = 0;
@@ -179,6 +186,8 @@ function parseAtCoderTable(tableHtml) {
   return rows;
 }
 
+
+// atcoder.jp does not provide a public API, so we scrape the contest list pages. We cache the results for 10 minutes.
 let atContestsCache = null;
 let atCacheTime = 0;
 router.get('/atcoder-contests', async (req, res) => {

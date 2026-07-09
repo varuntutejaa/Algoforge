@@ -1,16 +1,27 @@
 const express = require("express");
 const crypto = require("crypto");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const Contest = require("../models/Contest");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
-const { loadRequestUser, ensureUserProfileFields, getUserIdFromRequest } = require("../utils/profileHelpers");
+const { loadRequestUser, ensureUserProfileFields, getUserIdFromRequest, getVerdict } = require("../utils/profileHelpers");
 const { verifyFirebaseToken } = require("../middleware/auth");
+const { formatProblem } = require("../services/problems");
+const { languageIds, runJudge0Submission } = require("../services/judge0");
 
 const router = express.Router();
 
 function generateContestCode() {
   return crypto.randomBytes(3).toString("hex").toUpperCase().slice(0, 6);
 }
+
+const contestSubmitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+});
 
 // GET /api/contests - List all contests the user is in or created
 router.get("/", async (req, res) => {
@@ -302,14 +313,14 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
 });
 
 // POST /api/contests/:code/submit - Submit a solution within a contest
-router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
+router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
 
-    const { problemId, language, sourceCode, verdict } = req.body;
+    const { problemId, language, sourceCode } = req.body;
     const code = String(req.params.code || '').toUpperCase();
-    console.log(`[contests] POST /:code/submit for code=${code} user=${user._id} verdict=${req.body?.verdict}`);
+    console.log(`[contests] POST /:code/submit for code=${code} user=${user._id} problemId=${problemId}`);
     const contest = await Contest.findOne({ code });
 
     if (!contest) {
@@ -320,6 +331,33 @@ router.post("/:code/submit", verifyFirebaseToken, async (req, res) => {
     if (now < contest.startsAt || now >= contest.endsAt) {
       return res.status(400).json({ success: false, message: "Contest is not active" });
     }
+
+    const inContest = contest.problems.some((p) => p.problemId === problemId);
+    if (!inContest) {
+      return res.status(400).json({ success: false, message: "Problem is not part of this contest" });
+    }
+
+    if (!languageIds[language]) {
+      return res.status(400).json({ success: false, message: "Unsupported language" });
+    }
+
+    if (!sourceCode || typeof sourceCode !== "string") {
+      return res.status(400).json({ success: false, message: "Source code is required" });
+    }
+
+    // Verdict is computed here, server-side, against the real judge — never trust a client-supplied verdict.
+    const problemDoc = await Problem.findOne({ id: problemId });
+    if (!problemDoc) {
+      return res.status(404).json({ success: false, message: "Problem not found" });
+    }
+
+    const problem = formatProblem(problemDoc);
+    const results = [];
+    for (const testCase of problem.testCases) {
+      results.push(await runJudge0Submission(problem, language, sourceCode, testCase));
+    }
+    const passed = results.every((result) => result.passed);
+    const verdict = getVerdict(results, passed);
 
     let participant = contest.participants.find(
       (p) => p.userId && p.userId.toString() === user._id.toString()

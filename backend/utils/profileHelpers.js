@@ -94,11 +94,9 @@ function ensureUserProfileFields(user) {
 }
 
 function getUserIdFromRequest(req) {
-    // Use Firebase-authenticated user from middleware if available
-    if (req.user) {
-        return req.user._id;
-    }
-    return req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
+    // Only ever trust the Firebase-authenticated user set by middleware —
+    // never a client-supplied header/body/query id (that was an IDOR).
+    return req.user ? req.user._id : null;
 }
 
 async function loadRequestUser(req, res) {

@@ -5,6 +5,8 @@ import { auth } from '@/config/firebase';
 import { backendAuth, persistUser } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 
+
+//
 export default function Signup() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -35,6 +37,8 @@ export default function Signup() {
     } finally { setLoading(false); }
   }
 
+
+// Google OAuth 
   async function handleGoogle() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
