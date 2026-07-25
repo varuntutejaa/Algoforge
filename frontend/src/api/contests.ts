@@ -60,28 +60,3 @@ export async function joinContest(code: string, headers: HeadersInit): Promise<C
   if (!data.success) throw new Error(data.message || 'Failed to join contest');
   return data.contest;
 }
-
-export async function submitContestCode(
-  payload: {
-    contestCode: string;
-    problemId: string;
-    language: string;
-    sourceCode: string;
-    action: 'run' | 'submit';
-  },
-  headers: HeadersInit
-) {
-  const res = await fetch(`${API_BASE_URL}/api/contests/submit`, {
-    method: 'POST',
-    headers: { ...headers as Record<string, string>, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return res.json();
-}
-
-// Fetch external contests from calendar API
-export async function fetchCalendarContests(): Promise<import('@/types/contest').Contest[]> {
-  const res = await fetch(`${API_BASE_URL}/api/contests/calendar`);
-  const data = await res.json();
-  return data.success ? data.contests : [];
-}

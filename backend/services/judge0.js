@@ -950,4 +950,17 @@ async function runJudge0Submission(problem, language, sourceCode, testCase) {
     };
 }
 
-module.exports = { languageIds, buildJudgeSource, runJudge0Submission };
+async function runTestSuite(problem, language, sourceCode) {
+    if (!problem.testCases || problem.testCases.length === 0) {
+        return { ready: false, results: [], passed: false };
+    }
+
+    const results = [];
+    for (const testCase of problem.testCases) {
+        results.push(await runJudge0Submission(problem, language, sourceCode, testCase));
+    }
+
+    return { ready: true, results, passed: results.every((result) => result.passed) };
+}
+
+module.exports = { languageIds, buildJudgeSource, runJudge0Submission, runTestSuite };

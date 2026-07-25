@@ -65,23 +65,37 @@ function fireToast(message: string, type: ToastType = 'info', duration = 4000) {
   toast.className = 'af-toast';
   toast.style.borderColor = BORDER_COLORS[type];
 
-  toast.innerHTML = `
-    <span class="af-toast-icon" style="color:${COLORS[type]}">${ICONS[type]}</span>
-    <span class="af-toast-msg">${message}</span>
-    <button class="af-toast-close" aria-label="Close">&times;</button>
-    <div class="af-toast-bar"><div class="af-toast-bar-fill" style="background:${COLORS[type]}"></div></div>
-  `;
+  const icon = document.createElement('span');
+  icon.className = 'af-toast-icon';
+  icon.style.color = COLORS[type];
+  icon.textContent = ICONS[type];
 
+  const msg = document.createElement('span');
+  msg.className = 'af-toast-msg';
+  msg.textContent = message;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'af-toast-close';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.textContent = '×';
+
+  const fill = document.createElement('div');
+  fill.className = 'af-toast-bar-fill';
+  fill.style.background = COLORS[type];
+  const bar = document.createElement('div');
+  bar.className = 'af-toast-bar';
+  bar.appendChild(fill);
+
+  toast.append(icon, msg, closeBtn, bar);
   wrap.appendChild(toast);
 
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('af-show')));
 
-  const fill = toast.querySelector<HTMLElement>('.af-toast-bar-fill')!;
   fill.style.transitionDuration = `${duration}ms`;
   requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = '0%'; }));
 
   const timer = setTimeout(() => dismiss(toast), duration);
-  toast.querySelector('.af-toast-close')!.addEventListener('click', () => {
+  closeBtn.addEventListener('click', () => {
     clearTimeout(timer);
     dismiss(toast);
   });

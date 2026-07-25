@@ -1,7 +1,17 @@
 const express = require('express');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const Problem = require('../models/Problem');
 const { formatProblem } = require('../services/problems');
+const { requireAdminKey } = require('../middleware/adminAuth');
+
+const adminWriteLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip)
+});
 
 router.get('/', async (req, res) => {
     try {
@@ -55,16 +65,8 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create a new problem (admin)
-router.post('/', async (req, res) => {
+router.post('/', requireAdminKey, adminWriteLimiter, async (req, res) => {
     try {
-        const adminKey = process.env.ADMIN_API_KEY;
-        if (!adminKey || req.headers['x-admin-key'] !== adminKey) {
-            return res.status(403).json({
-                success: false,
-                message: "Forbidden"
-            });
-        }
-
         const {
             id,
             title,

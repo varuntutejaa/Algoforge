@@ -5,7 +5,7 @@ const Problem = require('../models/Problem');
 const Submission = require('../models/Submission');
 const { getVerdict, getSubmissionMetrics, updateStreak } = require('../utils/profileHelpers');
 const { formatProblem, getDailyProblemId } = require('../services/problems');
-const { languageIds, runJudge0Submission } = require('../services/judge0');
+const { languageIds, runTestSuite } = require('../services/judge0');
 
 const submitLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -18,6 +18,14 @@ const submitLimiter = rateLimit({
 router.post('/', submitLimiter, async (req, res) => {
     try {
         const { problemId = "two-sum", language, sourceCode, action = "submit" } = req.body;
+
+        if (typeof problemId !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "problemId must be a string"
+            });
+        }
+
         const isSubmit = action === "submit";
         const problemDoc = await Problem.findOne({ id: problemId });
 
@@ -43,14 +51,15 @@ router.post('/', submitLimiter, async (req, res) => {
         }
 
         const problem = formatProblem(problemDoc);
-        const results = [];
+        const { ready, results, passed } = await runTestSuite(problem, language, sourceCode);
 
-        for (const testCase of problem.testCases) {
-            const result = await runJudge0Submission(problem, language, sourceCode, testCase);
-            results.push(result);
+        if (!ready) {
+            return res.status(422).json({
+                success: false,
+                message: "This problem doesn't have test cases yet and can't be judged."
+            });
         }
 
-        const passed = results.every((result) => result.passed);
         const verdict = getVerdict(results, passed);
         const { runtime, memory } = getSubmissionMetrics(results);
         const user = req.user;

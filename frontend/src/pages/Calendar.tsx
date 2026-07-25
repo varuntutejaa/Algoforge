@@ -264,7 +264,7 @@ export default function Calendar() {
         const [r1,r2]=await Promise.all([fetch(`${API_BASE_URL}/api/contests/available`,{headers:h}),fetch(`${API_BASE_URL}/api/contests`,{headers:h})]);
         const [d1,d2]=await Promise.all([r1.json(),r2.json()]);
         const merged:CalContest[]=[],seen=new Set<string>();
-        for(const c of [...(d1.contests||[]),(d2.contests||[])]) { if(!seen.has(c.code)){seen.add(c.code);merged.push({...c,source:'algoforge'});} }
+        for(const c of [...(d1.contests||[]),...(d2.contests||[])]) { if(!seen.has(c.code)){seen.add(c.code);merged.push({...c,source:'algoforge'});} }
         addContests(merged);
       } catch {}
       const exLoaders=[

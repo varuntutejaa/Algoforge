@@ -7,7 +7,7 @@ const Submission = require("../models/Submission");
 const { loadRequestUser, ensureUserProfileFields, getUserIdFromRequest, getVerdict } = require("../utils/profileHelpers");
 const { verifyFirebaseToken } = require("../middleware/auth");
 const { formatProblem } = require("../services/problems");
-const { languageIds, runJudge0Submission } = require("../services/judge0");
+const { languageIds, runTestSuite } = require("../services/judge0");
 
 const router = express.Router();
 
@@ -23,8 +23,16 @@ const contestSubmitLimiter = rateLimit({
   keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
 });
 
+const contestReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+});
+
 // GET /api/contests - List all contests the user is in or created
-router.get("/", async (req, res) => {
+router.get("/", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
     const filter = {};
@@ -64,7 +72,7 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/contests/available - Get contests available to join (upcoming + active, not joined, not created by user)
-router.get("/available", async (req, res) => {
+router.get("/available", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
     const now = new Date();
@@ -89,18 +97,20 @@ router.get("/available", async (req, res) => {
   }
 });
 
-// GET /api/contests/:code - Get contest details (including problems if active)
-router.get("/:code", async (req, res) => {
+// GET /api/contests/:code - Get contest details (problems only once it starts, unless you created it)
+router.get("/:code", verifyFirebaseToken, contestReadLimiter, async (req, res) => {
   try {
     const code = String(req.params.code || '').toUpperCase();
-    console.log(`[contests] GET /:code request for code=${code} from ip=${req.ip} headers.x-user-id=${req.headers['x-user-id']}`);
     const contest = await Contest.findOne({ code }).lean();
 
     if (!contest) {
       return res.status(404).json({ success: false, message: "Contest not found" });
     }
 
-    res.json({ success: true, contest: formatContestDetail(contest) });
+    const isCreator = contest.createdBy && contest.createdBy.toString() === req.user._id.toString();
+    const started = new Date() >= new Date(contest.startsAt);
+
+    res.json({ success: true, contest: formatContestDetail(contest, { includeProblems: isCreator || started }) });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to fetch contest" });
@@ -108,10 +118,9 @@ router.get("/:code", async (req, res) => {
 });
 
 // GET /api/contests/:code/leaderboard
-router.get("/:code/leaderboard", async (req, res) => {
+router.get("/:code/leaderboard", verifyFirebaseToken, contestReadLimiter, async (req, res) => {
   try {
     const code = String(req.params.code || '').toUpperCase();
-    console.log(`[contests] GET /:code/leaderboard for code=${code} headers.x-user-id=${req.headers['x-user-id']}`);
     const contest = await Contest.findOne({ code }).lean();
 
     if (!contest) {
@@ -142,7 +151,7 @@ router.get("/:code/leaderboard", async (req, res) => {
 
         return {
           name: p.name,
-          firebaseUid: p.firebaseUid || "",
+          userId: p.userId ? p.userId.toString() : null,
           score: Number(p.score) || 0,
           penalty: Number(p.penalty) || 0,
           wrongAttempts: Number(p.wrongAttempts) || 0,
@@ -277,6 +286,9 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "This contest has already ended" });
     }
 
+    const isCreator = contest.createdBy && contest.createdBy.toString() === user._id.toString();
+    const includeProblems = isCreator || now >= contest.startsAt;
+
     // Check if already a participant
     const existing = contest.participants.find(
       (p) => p.userId && p.userId.toString() === user._id.toString()
@@ -288,7 +300,7 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
         existing.firebaseUid = req.firebaseUid;
         await contest.save();
       }
-      return res.json({ success: true, contest: formatContestDetail(contest.toObject()) });
+      return res.json({ success: true, contest: formatContestDetail(contest.toObject(), { includeProblems }) });
     }
 
     contest.participants.push({
@@ -304,7 +316,7 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
     console.log(`[contests] POST /join user=${user._id} joined code=${code}`);
     res.json({
       success: true,
-      contest: formatContestDetail(contest.toObject())
+      contest: formatContestDetail(contest.toObject(), { includeProblems })
     });
   } catch (error) {
     console.log(error);
@@ -319,6 +331,11 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
     if (!user) return;
 
     const { problemId, language, sourceCode } = req.body;
+
+    if (typeof problemId !== "string") {
+      return res.status(400).json({ success: false, message: "problemId must be a string" });
+    }
+
     const code = String(req.params.code || '').toUpperCase();
     console.log(`[contests] POST /:code/submit for code=${code} user=${user._id} problemId=${problemId}`);
     const contest = await Contest.findOne({ code });
@@ -352,11 +369,15 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
     }
 
     const problem = formatProblem(problemDoc);
-    const results = [];
-    for (const testCase of problem.testCases) {
-      results.push(await runJudge0Submission(problem, language, sourceCode, testCase));
+    const { ready, results, passed } = await runTestSuite(problem, language, sourceCode);
+
+    if (!ready) {
+      return res.status(422).json({
+        success: false,
+        message: "This problem doesn't have test cases yet and can't be judged."
+      });
     }
-    const passed = results.every((result) => result.passed);
+
     const verdict = getVerdict(results, passed);
 
     let participant = contest.participants.find(
@@ -444,11 +465,11 @@ function formatContest(contest) {
   };
 }
 
-function formatContestDetail(contest) {
+function formatContestDetail(contest, { includeProblems = true } = {}) {
   return {
     ...formatContest(contest),
-    problems: contest.problems,
-    participants: contest.participants
+    problems: includeProblems ? contest.problems : [],
+    participants: (contest.participants || []).map(({ firebaseUid, ...rest }) => rest)
   };
 }
 

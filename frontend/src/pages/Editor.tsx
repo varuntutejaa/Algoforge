@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
-import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview } from '@/api/problems';
+import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview, fetchSolvedIds } from '@/api/problems';
 import DiffBadge from '@/components/ui/DiffBadge';
 import { IconArrowLeft, IconCheck, IconX, IconLock, IconBulb, IconSparkle, IconAlertCircle, IconPlay, IconSend, IconRotateCcw, IconChevronDown } from '@/components/ui/Icons';
 import type { ProblemDetail, Language } from '@/types/problem';
@@ -174,10 +174,9 @@ export default function Editor() {
 
   useEffect(() => {
     if (!problem) return;
-    fetch(`${(window as any).API_BASE_URL || 'http://localhost:8000'}/profile/solved`, { headers: getHeaders() as HeadersInit })
-      .then(r => r.json())
-      .then(d => { if (d.success && d.solvedIds?.includes(problemId)) { setIsSolved(true); setReviewUnlocked(true); } })
-      .catch(() => {});
+    fetchSolvedIds(getHeaders()).then(ids => {
+      if (ids.includes(problemId)) { setIsSolved(true); setReviewUnlocked(true); }
+    });
   }, [problem, problemId, getHeaders]);
 
   useEffect(() => {
