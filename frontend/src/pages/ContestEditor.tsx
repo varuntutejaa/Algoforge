@@ -75,7 +75,7 @@ export default function ContestEditor() {
     tick(); timerRef.current = setInterval(tick, 1000);
   }
 
-  const switchProblem = useCallback(async (idx: number, probList=problems, c=contest, lang=language) => {
+  const switchProblem = useCallback(async (idx: number, probList=problems, _c=contest, lang=language) => {
     setCurrentIdx(idx); const prob = probList[idx]; if (!prob) return;
     try {
       const detail = await fetchProblem(prob.problemId); setProblemDetail(detail);

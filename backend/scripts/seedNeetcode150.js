@@ -1,7 +1,6 @@
 const path = require('path');
-const mongoose = require('mongoose');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const Problem = require('../models/Problem');
+const { prisma } = require('../config/prismaClient');
 
 const STUB_BOILERPLATE = {
   c: '// Coming soon\nint solution() {\n    return 0;\n}',
@@ -201,7 +200,7 @@ const neetcode150 = [
 
 async function seed() {
   const existingIds = new Set(
-    (await Problem.find({}).select('id').lean()).map(p => p.id)
+    (await prisma.problem.findMany({ select: { id: true } })).map(p => p.id)
   );
 
   let created = 0;
@@ -214,17 +213,18 @@ async function seed() {
       continue;
     }
 
-    await Problem.create({
-      id:          p.id,
-      title:       p.title,
-      difficulty:  p.difficulty,
-      tags:        p.tags,
-      description: ['This problem is coming soon. Full description, test cases, and solutions will be added shortly.'],
-      constraints: [],
-      example:     'Coming soon',
-      boilerplate: STUB_BOILERPLATE,
-      testCases:   [],
-      runner:      null,
+    await prisma.problem.create({
+      data: {
+        id:          p.id,
+        title:       p.title,
+        difficulty:  p.difficulty,
+        tags:        p.tags,
+        description: ['This problem is coming soon. Full description, test cases, and solutions will be added shortly.'],
+        constraints: [],
+        example:     'Coming soon',
+        boilerplate: STUB_BOILERPLATE,
+        runner:      null,
+      }
     });
 
     console.log(`  created ${p.id}`);
@@ -234,14 +234,13 @@ async function seed() {
   console.log(`\nDone. Created: ${created}, Skipped (already exist): ${skipped}`);
 }
 
-mongoose.connect(process.env.MONGO_URI)
+seed()
   .then(async () => {
-    console.log('MongoDB connected\n');
-    await seed();
-    await mongoose.disconnect();
+    await prisma.$disconnect();
     process.exit(0);
   })
-  .catch(err => {
+  .catch(async (err) => {
     console.error('Failed:', err.message);
+    await prisma.$disconnect();
     process.exit(1);
   });

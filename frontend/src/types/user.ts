@@ -1,7 +1,6 @@
 export interface AlgoforgeUser {
   id: string;
   uid: string;
-  firebaseUid: string;
   name: string;
   email: string;
   photoURL: string;

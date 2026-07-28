@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import { Link, useNavigate } from 'react-router-dom';
+import { CognitoUser } from 'amazon-cognito-identity-js';
+import { userPool } from '@/config/cognito';
 import { useToast } from '@/hooks/useToast';
 import { API_BASE_URL } from '@/config/api';
 
 export default function ForgotPassword() {
+  const navigate = useNavigate();
   const toast = useToast();
+  const [stage, setStage] = useState<'email' | 'reset'>('email');
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,10 +31,40 @@ export default function ForgotPassword() {
         return;
       }
 
-      await sendPasswordResetEmail(auth, email.trim());
-      setSent(true);
+      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
+      await new Promise<void>((resolve, reject) => {
+        cognitoUser.forgotPassword({
+          onSuccess: () => resolve(),
+          onFailure: (err) => reject(err),
+        });
+      });
+
+      setStage('reset');
+      toast.success('Check your email for a reset code.');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send reset email');
+      toast.error(err.message || 'Failed to send reset code');
+    } finally { setLoading(false); }
+  }
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) { toast.error('Enter the code sent to your email'); return; }
+    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    if (newPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+    setLoading(true);
+    try {
+      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
+      await new Promise<void>((resolve, reject) => {
+        cognitoUser.confirmPassword(code.trim(), newPassword, {
+          onSuccess: () => resolve(),
+          onFailure: (err) => reject(err),
+        });
+      });
+
+      toast.success('Password reset — sign in with your new password.');
+      setTimeout(() => navigate('/login'), 900);
+    } catch (err: any) {
+      toast.error(err.message || 'Invalid or expired code');
     } finally { setLoading(false); }
   }
 
@@ -44,19 +78,12 @@ export default function ForgotPassword() {
               <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
             </Link>
             <h2 className="form-title">Reset password</h2>
-            <p className="form-sub">We'll send a reset link to your email.</p>
+            <p className="form-sub">
+              {stage === 'email' ? "We'll send a reset code to your email." : <>Enter the code sent to <strong>{email}</strong>.</>}
+            </p>
           </div>
 
-          {sent ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <p style={{ fontSize: 14, color: '#4fd1a0', textAlign: 'center', background: 'rgba(79,209,160,0.08)', borderRadius: 10, padding: '12px 16px' }}>
-                ✓ Reset link sent to <strong>{email}</strong>. Check your inbox.
-              </p>
-              <Link to="/login" className="submit-btn" style={{ textAlign: 'center', display: 'block' }}>
-                Back to Login
-              </Link>
-            </div>
-          ) : (
+          {stage === 'email' ? (
             <form onSubmit={handleSubmit} noValidate>
               <div className="field-group">
                 <label className="field-label">Email</label>
@@ -66,7 +93,34 @@ export default function ForgotPassword() {
                 </div>
               </div>
               <button type="submit" className="submit-btn" disabled={loading} style={{ marginTop: 8 }}>
-                {loading ? 'Sending…' : 'Send Reset Link'}
+                {loading ? 'Sending…' : 'Send Reset Code'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleReset} noValidate>
+              <div className="field-group">
+                <label className="field-label">Reset Code</label>
+                <div className="field-wrap">
+                  <input type="text" inputMode="numeric" className="field-input" placeholder="123456"
+                    value={code} onChange={e => setCode(e.target.value)} autoComplete="one-time-code" />
+                </div>
+              </div>
+              <div className="field-group">
+                <label className="field-label">New Password</label>
+                <div className="field-wrap">
+                  <input type="password" className="field-input" placeholder="Minimum 8 characters"
+                    value={newPassword} onChange={e => setNewPassword(e.target.value)} autoComplete="new-password" />
+                </div>
+              </div>
+              <div className="field-group">
+                <label className="field-label">Confirm New Password</label>
+                <div className="field-wrap">
+                  <input type="password" className="field-input" placeholder="Repeat password"
+                    value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+                </div>
+              </div>
+              <button type="submit" className="submit-btn" disabled={loading} style={{ marginTop: 8 }}>
+                {loading ? 'Resetting…' : 'Reset Password'}
               </button>
             </form>
           )}

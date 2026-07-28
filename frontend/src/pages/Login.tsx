@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '@/config/firebase';
-import { backendAuth, persistUser } from '@/context/AuthContext';
+import { CognitoUser, AuthenticationDetails, type CognitoUserSession } from 'amazon-cognito-identity-js';
+import { userPool, redirectToGoogleSignIn } from '@/config/cognito';
+import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { IconEye, IconEyeOff } from '@/components/ui/Icons';
 
@@ -11,6 +11,7 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Login() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -22,7 +23,7 @@ export default function Login() {
     if (!email.trim()) e.email = 'Email is required';
     else if (!emailRe.test(email.trim())) e.email = 'Enter a valid email';
     if (!password) e.password = 'Password is required';
-    else if (password.length < 6) e.password = 'Minimum 6 characters';
+    else if (password.length < 8) e.password = 'Minimum 8 characters';
     setErrors(e);
     return !Object.keys(e).length;
   }
@@ -32,32 +33,30 @@ export default function Login() {
     if (!validate()) return;
     setLoading(true);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const idToken = await cred.user.getIdToken();
+      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
+      const authDetails = new AuthenticationDetails({ Username: email.trim(), Password: password });
+
+      const session = await new Promise<CognitoUserSession>((resolve, reject) => {
+        cognitoUser.authenticateUser(authDetails, {
+          onSuccess: (result) => resolve(result),
+          onFailure: (err) => reject(err),
+        });
+      });
+
+      const idToken = session.getIdToken().getJwtToken();
       const data = await backendAuth('login', idToken);
       if (!data.success) { toast.error(data.message || 'Login failed'); return; }
-      persistUser(data.user, idToken);
+      login(data.user, idToken);
       toast.success('Welcome back!');
       setTimeout(() => navigate('/problems'), 800);
     } catch (err: any) {
-      toast.error(err.message || 'Login failed');
-    } finally { setLoading(false); }
-  }
-
-  async function handleGoogle() {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    setLoading(true);
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const idToken = await result.user.getIdToken();
-      const data = await backendAuth('login', idToken);
-      if (!data.success) { toast.error(data.message || 'Google sign-in failed'); return; }
-      persistUser(data.user, idToken);
-      navigate('/problems');
-    } catch (err: any) {
-      if (err.code === 'auth/popup-blocked') { await signInWithRedirect(auth, provider); return; }
-      if (err.code !== 'auth/popup-closed-by-user') toast.error(err.message || 'Google sign-in failed');
+      if (err.code === 'UserNotConfirmedException') {
+        toast.error('Please confirm your email first — sign up again to resend the code.');
+      } else if (err.code === 'NotAuthorizedException') {
+        toast.error('Incorrect email or password.');
+      } else {
+        toast.error(err.message || 'Login failed');
+      }
     } finally { setLoading(false); }
   }
 
@@ -74,7 +73,7 @@ export default function Login() {
             <p className="form-sub">Welcome back to AlgoForge.</p>
           </div>
 
-          <button type="button" className="oauth-btn" onClick={handleGoogle} disabled={loading}>
+          <button type="button" className="oauth-btn" onClick={redirectToGoogleSignIn} disabled={loading}>
             <svg width="18" height="18" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>

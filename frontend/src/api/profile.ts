@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/config/api';
 import type { ProfileStats, SolvedItem, ActivityEntry } from '@/types/user';
 
+// fetch user profile stats from the backend API
 export async function fetchProfile(headers: HeadersInit, userId?: string): Promise<ProfileStats> {
   const q = userId ? `?userId=${encodeURIComponent(userId)}` : '';
   const res = await fetch(`${API_BASE_URL}/profile${q}`, { headers });
@@ -8,21 +9,21 @@ export async function fetchProfile(headers: HeadersInit, userId?: string): Promi
   if (!data.success) throw new Error(data.message || 'Failed to load profile');
   return data.profile;
 }
-
+// fetch solved problems list for the current user from the backend API
 export async function fetchSolvedList(headers: HeadersInit, userId?: string): Promise<SolvedItem[]> {
   const q = userId ? `?userId=${encodeURIComponent(userId)}` : '';
   const res = await fetch(`${API_BASE_URL}/profile/solved${q}`, { headers });
   const data = await res.json();
   return data.success ? data.solved : [];
 }
-
+// fetch user activity log from the backend API
 export async function fetchActivity(headers: HeadersInit, userId?: string): Promise<ActivityEntry[]> {
   const q = userId ? `?userId=${encodeURIComponent(userId)}` : '';
   const res = await fetch(`${API_BASE_URL}/profile/activity${q}`, { headers });
   const data = await res.json();
   return data.success ? data.activity : [];
 }
-
+// fetch user leaderboard rank from the backend API
 export async function fetchSubmissions(
   headers: HeadersInit,
   verdict = 'All'
@@ -41,6 +42,7 @@ export async function fetchSubmissions(
   return data.submissions;
 }
 
+//
 export async function fetchStreak(headers: HeadersInit): Promise<{ currentStreak: number; solvedToday: boolean }> {
   try {
     const res = await fetch(`${API_BASE_URL}/profile/streak`, { headers });

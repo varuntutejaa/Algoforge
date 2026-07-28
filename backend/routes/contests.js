@@ -1,11 +1,9 @@
 const express = require("express");
 const crypto = require("crypto");
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
-const Contest = require("../models/Contest");
-const Problem = require("../models/Problem");
-const Submission = require("../models/Submission");
-const { loadRequestUser, ensureUserProfileFields, getUserIdFromRequest, getVerdict } = require("../utils/profileHelpers");
-const { verifyFirebaseToken } = require("../middleware/auth");
+const { prisma } = require("../config/prismaClient");
+const { loadRequestUser, getUserIdFromRequest, getVerdict } = require("../utils/profileHelpers");
+const { requireAuth } = require("../middleware/auth");
 const { formatProblem } = require("../services/problems");
 const { languageIds, runTestSuite } = require("../services/judge0");
 
@@ -20,7 +18,7 @@ const contestSubmitLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
 const contestReadLimiter = rateLimit({
@@ -28,41 +26,22 @@ const contestReadLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
 // GET /api/contests - List all contests the user is in or created
 router.get("/", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
-    const filter = {};
+    const where = userId
+      ? { OR: [{ createdBy: userId }, { participants: { some: { userId } } }] }
+      : {};
 
-    if (userId) {
-      filter.$or = [
-        { createdBy: userId },
-        { "participants.userId": userId }
-      ];
-    }
-
-    const contests = await Contest.find(filter)
-      .sort({ startsAt: -1 })
-      .lean();
-
-    const now = new Date();
-
-    // Auto-update status in-memory and fire-and-forget bulkWrite — no re-fetch
-    const bulkOps = [];
-    for (const contest of contests) {
-      if (contest.status === "upcoming" && now >= contest.startsAt && now < contest.endsAt) {
-        contest.status = "active";
-        bulkOps.push({ updateOne: { filter: { _id: contest._id, status: "upcoming" }, update: { $set: { status: "active" } } } });
-      } else if (contest.status !== "ended" && now >= contest.endsAt) {
-        contest.status = "ended";
-        bulkOps.push({ updateOne: { filter: { _id: contest._id, status: { $ne: "ended" } }, update: { $set: { status: "ended" } } } });
-      }
-    }
-
-    if (bulkOps.length) Contest.bulkWrite(bulkOps).catch(console.error);
+    const contests = await prisma.contest.findMany({
+      where,
+      orderBy: { startsAt: "desc" },
+      include: { problems: true, participants: true }
+    });
 
     res.json({ success: true, contests: contests.map(formatContest) });
   } catch (error) {
@@ -75,20 +54,18 @@ router.get("/", contestReadLimiter, async (req, res) => {
 router.get("/available", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
-    const now = new Date();
-
-    const filter = {
-      endsAt: { $gt: now }
-    };
+    const where = { endsAt: { gt: new Date() } };
 
     if (userId) {
-      filter.createdBy = { $ne: userId };
-      filter["participants.userId"] = { $ne: userId };
+      where.createdBy = { not: userId };
+      where.participants = { none: { userId } };
     }
 
-    const contests = await Contest.find(filter)
-      .sort({ startsAt: 1 })
-      .lean();
+    const contests = await prisma.contest.findMany({
+      where,
+      orderBy: { startsAt: "asc" },
+      include: { problems: true, participants: true }
+    });
 
     res.json({ success: true, contests: contests.map(formatContest) });
   } catch (error) {
@@ -98,17 +75,23 @@ router.get("/available", contestReadLimiter, async (req, res) => {
 });
 
 // GET /api/contests/:code - Get contest details (problems only once it starts, unless you created it)
-router.get("/:code", verifyFirebaseToken, contestReadLimiter, async (req, res) => {
+router.get("/:code", requireAuth, contestReadLimiter, async (req, res) => {
   try {
-    const code = String(req.params.code || '').toUpperCase();
-    const contest = await Contest.findOne({ code }).lean();
+    const code = String(req.params.code || "").toUpperCase();
+    const contest = await prisma.contest.findUnique({
+      where: { code },
+      include: {
+        problems: { orderBy: { position: "asc" } },
+        participants: { include: { solves: true } }
+      }
+    });
 
     if (!contest) {
       return res.status(404).json({ success: false, message: "Contest not found" });
     }
 
-    const isCreator = contest.createdBy && contest.createdBy.toString() === req.user._id.toString();
-    const started = new Date() >= new Date(contest.startsAt);
+    const isCreator = contest.createdBy === req.user.id;
+    const started = new Date() >= contest.startsAt;
 
     res.json({ success: true, contest: formatContestDetail(contest, { includeProblems: isCreator || started }) });
   } catch (error) {
@@ -118,44 +101,43 @@ router.get("/:code", verifyFirebaseToken, contestReadLimiter, async (req, res) =
 });
 
 // GET /api/contests/:code/leaderboard
-router.get("/:code/leaderboard", verifyFirebaseToken, contestReadLimiter, async (req, res) => {
+router.get("/:code/leaderboard", requireAuth, contestReadLimiter, async (req, res) => {
   try {
-    const code = String(req.params.code || '').toUpperCase();
-    const contest = await Contest.findOne({ code }).lean();
+    const code = String(req.params.code || "").toUpperCase();
+    const contest = await prisma.contest.findUnique({
+      where: { code },
+      include: { participants: { include: { solves: true } } }
+    });
 
     if (!contest) {
       return res.status(404).json({ success: false, message: "Contest not found" });
     }
 
     const leaderboard = contest.participants
-      .slice()
       .map((p) => {
         const finishedAt = p.finishedAt || null;
         let timeTakenSeconds = null;
-        try {
-          if (finishedAt && contest.startsAt) {
-            timeTakenSeconds = Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000));
-          }
-        } catch (e) { timeTakenSeconds = null; }
+        if (finishedAt && contest.startsAt) {
+          timeTakenSeconds = Math.max(0, Math.floor((new Date(finishedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000));
+        }
+
         // per-problem solve times in seconds relative to contest start
         const perProblem = {};
-        (p.solveTimestamps || []).forEach((st) => {
-          try {
-            if (st.problemId && st.solvedAt && contest.startsAt) {
-              perProblem[st.problemId] = Math.max(0, Math.floor(
-                (new Date(st.solvedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000
-              ));
-            }
-          } catch (e) {}
-        });
+        for (const st of p.solves) {
+          if (st.problemId && st.solvedAt && contest.startsAt) {
+            perProblem[st.problemId] = Math.max(0, Math.floor(
+              (new Date(st.solvedAt).getTime() - new Date(contest.startsAt).getTime()) / 1000
+            ));
+          }
+        }
 
         return {
           name: p.name,
-          userId: p.userId ? p.userId.toString() : null,
-          score: Number(p.score) || 0,
-          penalty: Number(p.penalty) || 0,
-          wrongAttempts: Number(p.wrongAttempts) || 0,
-          solvedProblems: p.solvedProblems || [],
+          userId: p.userId,
+          score: p.score,
+          penalty: p.penalty,
+          wrongAttempts: p.wrongAttempts,
+          solvedProblems: p.solves.map((s) => s.problemId),
           perProblemTimes: perProblem,
           finishedAt,
           timeTakenSeconds
@@ -178,7 +160,7 @@ router.get("/:code/leaderboard", verifyFirebaseToken, contestReadLimiter, async 
 });
 
 // POST /api/contests/create - Create a new contest
-router.post("/create", verifyFirebaseToken, async (req, res) => {
+router.post("/create", requireAuth, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -197,7 +179,7 @@ router.post("/create", verifyFirebaseToken, async (req, res) => {
     let exists = true;
     while (exists) {
       code = generateContestCode();
-      exists = await Contest.findOne({ code });
+      exists = await prisma.contest.findUnique({ where: { code } });
     }
 
     const startsAtDate = new Date(startsAt);
@@ -208,18 +190,12 @@ router.post("/create", verifyFirebaseToken, async (req, res) => {
     if (isRandom) {
       // Pick random problems from the database
       const count = problems?.count || 3;
-      const allProblems = await Problem.aggregate([{ $sample: { size: count } }]);
-      contestProblems = allProblems.map((p) => ({
-        problemId: p.id,
-        title: p.title
-      }));
+      const sampled = await prisma.$queryRaw`SELECT id, title FROM problems ORDER BY random() LIMIT ${count}`;
+      contestProblems = sampled.map((p) => ({ problemId: p.id, title: p.title }));
     } else if (problems && Array.isArray(problems) && problems.length > 0) {
       // Use selected problems
-      const problemDocs = await Problem.find({ id: { $in: problems } }).lean();
-      contestProblems = problemDocs.map((p) => ({
-        problemId: p.id,
-        title: p.title
-      }));
+      const problemDocs = await prisma.problem.findMany({ where: { id: { in: problems } } });
+      contestProblems = problemDocs.map((p) => ({ problemId: p.id, title: p.title }));
     } else {
       return res.status(400).json({
         success: false,
@@ -227,35 +203,27 @@ router.post("/create", verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    const contest = new Contest({
-      code,
-      title,
-      description: description || "",
-      createdBy: user._id,
-      createdByName: user.name || user.email,
-      problems: contestProblems,
-      startsAt: startsAtDate,
-      endsAt: endsAtDate,
-      status: new Date() >= startsAtDate ? "active" : "upcoming",
-      isRandom: !!isRandom
+    const contest = await prisma.contest.create({
+      data: {
+        code,
+        title,
+        description: description || "",
+        createdBy: user.id,
+        createdByName: user.name || user.email,
+        startsAt: startsAtDate,
+        endsAt: endsAtDate,
+        isRandom: !!isRandom,
+        problems: {
+          create: contestProblems.map((p, index) => ({ problemId: p.problemId, title: p.title, position: index }))
+        },
+        participants: {
+          create: [{ userId: user.id, authId: req.user?.authId || "", name: user.name || user.email }]
+        }
+      },
+      include: { problems: true, participants: true }
     });
 
-    await contest.save();
-
-    // Add creator as participant
-    contest.participants.push({
-      userId: user._id,
-      firebaseUid: req.firebaseUid || "",
-      name: user.name || user.email,
-      score: 0,
-      solvedProblems: [],
-    });
-    await contest.save();
-
-    res.status(201).json({
-      success: true,
-      contest: formatContest(contest.toObject())
-    });
+    res.status(201).json({ success: true, contest: formatContest(contest) });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to create contest" });
@@ -263,7 +231,7 @@ router.post("/create", verifyFirebaseToken, async (req, res) => {
 });
 
 // POST /api/contests/join - Join a contest by code
-router.post("/join", verifyFirebaseToken, async (req, res) => {
+router.post("/join", requireAuth, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -274,7 +242,10 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "Contest code is required" });
     }
 
-    const contest = await Contest.findOne({ code: code.toUpperCase() });
+    const contest = await prisma.contest.findUnique({
+      where: { code: code.toUpperCase() },
+      include: { problems: true, participants: { include: { solves: true } } }
+    });
 
     if (!contest) {
       return res.status(404).json({ success: false, message: "Contest not found" });
@@ -286,38 +257,32 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "This contest has already ended" });
     }
 
-    const isCreator = contest.createdBy && contest.createdBy.toString() === user._id.toString();
+    const isCreator = contest.createdBy === user.id;
     const includeProblems = isCreator || now >= contest.startsAt;
 
     // Check if already a participant
-    const existing = contest.participants.find(
-      (p) => p.userId && p.userId.toString() === user._id.toString()
-    );
+    const existing = contest.participants.find((p) => p.userId === user.id);
 
     if (existing) {
-      // Backfill firebaseUid if it was empty (older join) so refresh-matching works
-      if (!existing.firebaseUid && req.firebaseUid) {
-        existing.firebaseUid = req.firebaseUid;
-        await contest.save();
+      // Backfill authId if it was empty (older join) so refresh-matching works
+      if (!existing.authId && req.user?.authId) {
+        await prisma.contestParticipant.update({
+          where: { contestId_userId: { contestId: contest.id, userId: user.id } },
+          data: { authId: req.user.authId }
+        });
+        existing.authId = req.user.authId;
       }
-      return res.json({ success: true, contest: formatContestDetail(contest.toObject(), { includeProblems }) });
+      return res.json({ success: true, contest: formatContestDetail(contest, { includeProblems }) });
     }
 
-    contest.participants.push({
-      userId: user._id,
-      firebaseUid: req.firebaseUid || "",
-      name: user.name || user.email,
-      score: 0,
-      solvedProblems: [],
+    const newParticipant = await prisma.contestParticipant.create({
+      data: { contestId: contest.id, userId: user.id, authId: req.user?.authId || "", name: user.name || user.email },
+      include: { solves: true }
     });
+    contest.participants.push(newParticipant);
 
-    await contest.save();
-
-    console.log(`[contests] POST /join user=${user._id} joined code=${code}`);
-    res.json({
-      success: true,
-      contest: formatContestDetail(contest.toObject(), { includeProblems })
-    });
+    console.log(`[contests] POST /join user=${user.id} joined code=${code}`);
+    res.json({ success: true, contest: formatContestDetail(contest, { includeProblems }) });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to join contest" });
@@ -325,7 +290,7 @@ router.post("/join", verifyFirebaseToken, async (req, res) => {
 });
 
 // POST /api/contests/:code/submit - Submit a solution within a contest
-router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (req, res) => {
+router.post("/:code/submit", requireAuth, contestSubmitLimiter, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -336,9 +301,12 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
       return res.status(400).json({ success: false, message: "problemId must be a string" });
     }
 
-    const code = String(req.params.code || '').toUpperCase();
-    console.log(`[contests] POST /:code/submit for code=${code} user=${user._id} problemId=${problemId}`);
-    const contest = await Contest.findOne({ code });
+    const code = String(req.params.code || "").toUpperCase();
+    console.log(`[contests] POST /:code/submit for code=${code} user=${user.id} problemId=${problemId}`);
+    const contest = await prisma.contest.findUnique({
+      where: { code },
+      include: { problems: true }
+    });
 
     if (!contest) {
       return res.status(404).json({ success: false, message: "Contest not found" });
@@ -363,7 +331,7 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
     }
 
     // Verdict is computed here, server-side, against the real judge — never trust a client-supplied verdict.
-    const problemDoc = await Problem.findOne({ id: problemId });
+    const problemDoc = await prisma.problem.findUnique({ where: { id: problemId }, include: { testCases: true } });
     if (!problemDoc) {
       return res.status(404).json({ success: false, message: "Problem not found" });
     }
@@ -380,68 +348,64 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
 
     const verdict = getVerdict(results, passed);
 
-    let participant = contest.participants.find(
-      (p) => p.userId && p.userId.toString() === user._id.toString()
-    );
-
-    // Self-heal: if the user submits but isn't registered yet (join failed,
-    // direct URL, expired token at join time), register them now so their
-    // solve is always recorded and they appear on the leaderboard.
-    if (!participant) {
-      contest.participants.push({
-        userId: user._id,
-        firebaseUid: req.firebaseUid || "",
-        name: user.name || user.email,
-        score: 0,
-        solvedProblems: [],
+    await prisma.$transaction(async (tx) => {
+      let participant = await tx.contestParticipant.findUnique({
+        where: { contestId_userId: { contestId: contest.id, userId: user.id } },
+        include: { solves: true }
       });
-      participant = contest.participants[contest.participants.length - 1];
-      console.log(`[contests] /submit auto-registered user=${user._id} in code=${code}`);
-    }
 
-    // Backfill firebaseUid for participants joined before this field existed
-    if (!participant.firebaseUid && req.firebaseUid) {
-      participant.firebaseUid = req.firebaseUid;
-    }
-
-    const alreadySolved = participant.solvedProblems.includes(problemId);
-
-    if (!alreadySolved) {
-      if (verdict === "Accepted") {
-        if (!Array.isArray(participant.solvedProblems)) participant.solvedProblems = [];
-        participant.solvedProblems.push(problemId);
-        if (!Array.isArray(participant.solveTimestamps)) participant.solveTimestamps = [];
-        participant.solveTimestamps.push({ problemId, solvedAt: new Date() });
-        if (typeof participant.score !== 'number' || Number.isNaN(participant.score)) participant.score = 0;
-        participant.score = Number(participant.score) + 100;
-      } else {
-        participant.score = (Number(participant.score) || 0) - 10;
-        participant.penalty = (Number(participant.penalty) || 0) - 10;
-        participant.wrongAttempts = (Number(participant.wrongAttempts) || 0) + 1;
+      // Self-heal: if the user submits but isn't registered yet (join failed,
+      // direct URL, expired token at join time), register them now so their
+      // solve is always recorded and they appear on the leaderboard.
+      if (!participant) {
+        participant = await tx.contestParticipant.create({
+          data: { contestId: contest.id, userId: user.id, authId: req.user?.authId || "", name: user.name || user.email },
+          include: { solves: true }
+        });
+        console.log(`[contests] /submit auto-registered user=${user.id} in code=${code}`);
+      } else if (!participant.authId && req.user?.authId) {
+        // Backfill authId for participants joined before this field existed
+        await tx.contestParticipant.update({
+          where: { contestId_userId: { contestId: contest.id, userId: user.id } },
+          data: { authId: req.user.authId }
+        });
       }
-    }
 
-    // Check if all problems solved - mark finished
-    if (participant.solvedProblems.length === contest.problems.length && !participant.finishedAt) {
-      participant.finishedAt = new Date();
-    }
+      const alreadySolved = participant.solves.some((s) => s.problemId === problemId);
+      const participantUpdate = {};
 
-    // If every participant has finished all problems, end the contest early
-    try {
-      const allFinished = contest.participants.length > 0 && contest.participants.every((p) => {
-        const solvedCount = Array.isArray(p.solvedProblems) ? p.solvedProblems.length : 0;
-        return p.finishedAt || solvedCount === contest.problems.length;
-      });
+      if (!alreadySolved) {
+        if (verdict === "Accepted") {
+          participantUpdate.score = { increment: 100 };
+          await tx.contestSolve.create({ data: { contestId: contest.id, userId: user.id, problemId, solvedAt: new Date() } });
+        } else {
+          participantUpdate.score = { increment: -10 };
+          participantUpdate.penalty = { increment: -10 };
+          participantUpdate.wrongAttempts = { increment: 1 };
+        }
+      }
+
+      // Check if all problems solved - mark finished
+      const newSolvedCount = participant.solves.length + (!alreadySolved && verdict === "Accepted" ? 1 : 0);
+      if (newSolvedCount === contest.problems.length && !participant.finishedAt) {
+        participantUpdate.finishedAt = new Date();
+      }
+
+      if (Object.keys(participantUpdate).length > 0) {
+        await tx.contestParticipant.update({
+          where: { contestId_userId: { contestId: contest.id, userId: user.id } },
+          data: participantUpdate
+        });
+      }
+
+      // If every participant has finished all problems, end the contest early
+      const allParticipants = await tx.contestParticipant.findMany({ where: { contestId: contest.id } });
+      const allFinished = allParticipants.length > 0 && allParticipants.every((p) => p.finishedAt != null);
 
       if (allFinished) {
-        contest.status = 'ended';
-        contest.endsAt = new Date();
+        await tx.contest.update({ where: { id: contest.id }, data: { endsAt: new Date() } });
       }
-    } catch (e) {
-      // ignore
-    }
-
-    await contest.save();
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -449,6 +413,17 @@ router.post("/:code/submit", verifyFirebaseToken, contestSubmitLimiter, async (r
     res.status(500).json({ success: false, message: "Failed to record contest submission" });
   }
 });
+
+// `status` isn't a stored column — it's computed from startsAt/endsAt plus
+// whether every participant has already finished (replaces a race-prone
+// fire-and-forget bulkWrite that used to patch a stored status field).
+function computeStatus(contest, participants) {
+  const now = new Date();
+  if (now < contest.startsAt) return "upcoming";
+  if (now >= contest.endsAt) return "ended";
+  if (participants.length > 0 && participants.every((p) => p.finishedAt != null)) return "ended";
+  return "active";
+}
 
 function formatContest(contest) {
   return {
@@ -460,7 +435,7 @@ function formatContest(contest) {
     participantCount: contest.participants.length,
     startsAt: contest.startsAt,
     endsAt: contest.endsAt,
-    status: contest.status,
+    status: computeStatus(contest, contest.participants),
     isRandom: contest.isRandom
   };
 }
@@ -468,8 +443,16 @@ function formatContest(contest) {
 function formatContestDetail(contest, { includeProblems = true } = {}) {
   return {
     ...formatContest(contest),
-    problems: includeProblems ? contest.problems : [],
-    participants: (contest.participants || []).map(({ firebaseUid, ...rest }) => rest)
+    problems: includeProblems ? contest.problems.map((p) => ({ problemId: p.problemId, title: p.title })) : [],
+    participants: (contest.participants || []).map((p) => ({
+      userId: p.userId,
+      name: p.name,
+      score: p.score,
+      penalty: p.penalty,
+      wrongAttempts: p.wrongAttempts,
+      solvedProblems: (p.solves || []).map((s) => s.problemId),
+      finishedAt: p.finishedAt
+    }))
   };
 }
 

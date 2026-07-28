@@ -1,9 +1,9 @@
-// Firebase-token-based login/signup: verifies the token and returns/creates the user profile.
+// Cognito-token-based login/signup: verifies the ID token and returns/creates the user profile.
 const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
-const { verifyFirebaseToken } = require('../middleware/auth');
-const User = require('../models/users');
+const { requireAuth } = require('../middleware/auth');
+const { prisma } = require('../config/prismaClient');
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -21,28 +21,24 @@ const emailCheckLimiter = rateLimit({
     keyGenerator: (req) => ipKeyGenerator(req.ip)
 });
 
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 router.post('/check-email', emailCheckLimiter, async (req, res) => {
     const email = (req.body.email || '').trim();
     if (!email) {
         return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    const user = await User.findOne({ email: new RegExp(`^${escapeRegex(email)}$`, 'i') });
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
     res.json({ success: true, exists: !!user });
 });
 
-router.post('/login', authLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/login', authLimiter, requireAuth, async (req, res) => {
     const user = req.user;
     res.json({
         success: true,
         message: "Login successful",
         user: {
-            id: user._id.toString(),
-            firebaseUid: user.firebaseUid,
+            id: user.id,
+            authId: user.authId,
             name: user.name,
             email: user.email,
             profilePicture: user.profilePicture,
@@ -51,14 +47,14 @@ router.post('/login', authLimiter, verifyFirebaseToken, async (req, res) => {
     });
 });
 
-router.post('/signup', authLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/signup', authLimiter, requireAuth, async (req, res) => {
     const user = req.user;
     res.json({
         success: true,
         message: "Signup successful",
         user: {
-            id: user._id.toString(),
-            firebaseUid: user.firebaseUid,
+            id: user.id,
+            authId: user.authId,
             name: user.name,
             email: user.email,
             profilePicture: user.profilePicture

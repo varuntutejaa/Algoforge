@@ -8,7 +8,7 @@ const { connectWithRetry } = require('./config/db');
 
 const contestRoutes = require('./routes/contests');
 const externalContestsRoutes = require('./routes/externalContests');
-const healthRoutes = require('./routes/health');
+const publicHealthRoutes = require('./routes/publicHealth');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const problemsRoutes = require('./routes/problems');
@@ -36,41 +36,45 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Mounted before DB connect so /health responds immediately (as "degraded" until Mongo connects).
+app.use(publicHealthRoutes);
+
 connectWithRetry();
 
-// optionalAuth verifies a Firebase token when present, without rejecting anonymous requests.
+// optionalAuth attaches req.user when a valid session is present, without rejecting anonymous requests.
 app.use('/api/contests', optionalAuth, contestRoutes);
 app.use('/api', externalContestsRoutes);
-app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/profile', profileRoutes);
 app.use('/problems', problemsRoutes);
 app.use('/api', aiRoutes);
 app.use('/submit-code', optionalAuth, submissionsRoutes);
 
-app.listen(8000, () => {
-    console.log("Server running on 8000");
+const PORT = process.env.PORT || 8000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on ${PORT}`);
 
     // Pre-warm external contest caches so first user doesn't wait
     setTimeout(async () => {
         try {
-            await fetch('http://localhost:8000/api/codeforces-contests');
+            await fetch(`http://localhost:${PORT}/api/codeforces-contests`);
             console.log('✅ Codeforces cache warmed');
         } catch {}
         try {
-            await fetch('http://localhost:8000/api/leetcode-contests');
+            await fetch(`http://localhost:${PORT}/api/leetcode-contests`);
             console.log('✅ LeetCode cache warmed');
         } catch {}
         try {
-            await fetch('http://localhost:8000/api/codechef-contests');
+            await fetch(`http://localhost:${PORT}/api/codechef-contests`);
             console.log('✅ CodeChef cache warmed');
         } catch {}
         try {
-            await fetch('http://localhost:8000/api/atcoder-contests');
+            await fetch(`http://localhost:${PORT}/api/atcoder-contests`);
             console.log('✅ AtCoder cache warmed');
         } catch {}
         try {
-            await fetch('http://localhost:8000/api/hackerrank-contests');
+            await fetch(`http://localhost:${PORT}/api/hackerrank-contests`);
             console.log('✅ HackerRank cache warmed');
         } catch {}
     }, 100);

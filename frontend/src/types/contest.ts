@@ -28,7 +28,6 @@ export interface ContestProblem {
 export interface LeaderboardEntry {
   rank: number;
   userId?: string;
-  firebaseUid?: string;
   name: string;
   email?: string;
   score: number;

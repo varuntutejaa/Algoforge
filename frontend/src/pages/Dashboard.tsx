@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchProfile, fetchSolvedList, fetchActivity } from '@/api/profile';
-import DiffBadge from '@/components/ui/DiffBadge';
 import type { ProfileStats, SolvedItem, ActivityEntry } from '@/types/user';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

@@ -1,0 +1,25 @@
+{
+  // Fail CI on any new high/critical vulnerability in code that actually
+  // ships to production (devDependencies like the local Vite dev server are
+  // skipped — see --skip-dev in the workflow). The allowlist below is a
+  // short, dated, reviewed list of pre-existing transitive issues with no
+  // non-breaking fix available today.
+  //
+  // Review this file whenever `npm audit` output changes, and remove entries
+  // once vite/tailwindcss ship a fix or are upgraded. (The firebase-related
+  // undici/WebSocket advisories previously allowlisted here are gone as of
+  // 2025-07 — firebase was removed as part of the Cognito migration.)
+  "$schema": "https://raw.githubusercontent.com/IBM/audit-ci/main/docs/schema.json",
+  "high": true,
+  "critical": true,
+  "skip-dev": true,
+  "allowlist": [
+    // PostCSS path-traversal in sourcemap auto-loading — build-time only,
+    // reached via tailwindcss (categorized under "dependencies" though it's
+    // really a build tool). No sourcemaps are loaded from untrusted input. — 2025-07
+    "GHSA-r28c-9q8g-f849",
+    // Vite dev-server server.fs.deny bypass — dev server never runs in
+    // production (static build served from S3/CloudFront). — 2025-07
+    "GHSA-fx2h-pf6j-xcff"
+  ]
+}

@@ -1,8 +1,7 @@
 const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
-const Problem = require('../models/Problem');
-const Submission = require('../models/Submission');
+const { prisma } = require('../config/prismaClient');
 const { getVerdict, getSubmissionMetrics, updateStreak } = require('../utils/profileHelpers');
 const { formatProblem, getDailyProblemId } = require('../services/problems');
 const { languageIds, runTestSuite } = require('../services/judge0');
@@ -12,7 +11,7 @@ const submitLimiter = rateLimit({
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+    keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
 router.post('/', submitLimiter, async (req, res) => {
@@ -27,7 +26,10 @@ router.post('/', submitLimiter, async (req, res) => {
         }
 
         const isSubmit = action === "submit";
-        const problemDoc = await Problem.findOne({ id: problemId });
+        const problemDoc = await prisma.problem.findUnique({
+            where: { id: problemId },
+            include: { testCases: true }
+        });
 
         if (!problemDoc) {
             return res.status(404).json({
@@ -65,42 +67,47 @@ router.post('/', submitLimiter, async (req, res) => {
         const user = req.user;
 
         if (user && isSubmit) {
-            await Submission.create({
-                userId: user._id,
-                problemId: problem.id,
-                problemTitle: problemDoc.title,
-                language,
-                verdict,
-                runtime,
-                memory,
-                sourceCode,
-                submittedAt: new Date()
-            });
-
-            user.totalSubmissions += 1;
-
-            if (passed && verdict === "Accepted") {
-                user.acceptedSubmissions += 1;
-                user.problemsSolved = (user.problemsSolved || 0) + 1;
-
-                const dailyId = await getDailyProblemId();
-                if (dailyId && problem.id === dailyId) {
-                    updateStreak(user);
-                }
-
-                const alreadySolved = user.solvedProblems.some(
-                    (entry) => entry.problemId === problem.id
-                );
-
-                if (!alreadySolved) {
-                    user.solvedProblems.push({
+            await prisma.$transaction(async (tx) => {
+                await tx.submission.create({
+                    data: {
+                        userId: user.id,
                         problemId: problem.id,
-                        solvedAt: new Date()
+                        problemTitle: problemDoc.title,
+                        language,
+                        verdict,
+                        runtime,
+                        memory,
+                        sourceCode,
+                        submittedAt: new Date()
+                    }
+                });
+
+                const updateData = { totalSubmissions: { increment: 1 } };
+
+                if (passed && verdict === "Accepted") {
+                    updateData.acceptedSubmissions = { increment: 1 };
+
+                    const dailyId = await getDailyProblemId();
+                    if (dailyId && problem.id === dailyId) {
+                        const changed = updateStreak(user);
+                        if (changed) {
+                            updateData.currentStreak = user.currentStreak;
+                            updateData.longestStreak = user.longestStreak;
+                            updateData.lastActivityDate = user.lastActivityDate;
+                        }
+                    }
+
+                    // Upsert instead of the old find-in-array + push de-dup —
+                    // the (userId, problemId) primary key enforces uniqueness.
+                    await tx.solvedProblem.upsert({
+                        where: { userId_problemId: { userId: user.id, problemId: problem.id } },
+                        update: {},
+                        create: { userId: user.id, problemId: problem.id }
                     });
                 }
-            }
 
-            await user.save();
+                await tx.user.update({ where: { id: user.id }, data: updateData });
+            });
         }
 
         res.json({

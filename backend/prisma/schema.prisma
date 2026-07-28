@@ -1,0 +1,175 @@
+// AlgoForge relational schema (migrated from MongoDB/Mongoose).
+// See docs/DEPLOYMENT.md and the migration notes for design rationale —
+// notably: Contest.status is NOT stored (computed at read time from
+// startsAt/endsAt + participant completion, replacing a race-prone
+// fire-and-forget bulkWrite pattern), and User.problemsSolved is NOT stored
+// (derived via COUNT on solved_problems, replacing a counter that could
+// drift from the embedded-array-derived value in the old Mongoose code).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()"))
+  authId              String    @unique @map("auth_id")
+  email               String
+  name                String    @default("")
+  profilePicture      String    @default("") @map("profile_picture")
+  rating              Int       @default(1200)
+  totalSubmissions    Int       @default(0) @map("total_submissions")
+  acceptedSubmissions Int       @default(0) @map("accepted_submissions")
+  currentStreak       Int       @default(0) @map("current_streak")
+  longestStreak       Int       @default(0) @map("longest_streak")
+  lastActivityDate    DateTime? @map("last_activity_date") @db.Date
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  solvedProblems        SolvedProblem[]
+  submissions           Submission[]
+  createdContests        Contest[]            @relation("ContestCreator")
+  contestParticipations ContestParticipant[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Problem {
+  id          String   @id
+  title       String
+  difficulty  String
+  tags        String[] @default([])
+  description String[]
+  constraints String[] @default([])
+  example     String
+  boilerplate Json
+  runner      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  testCases       TestCase[]
+  solvedBy        SolvedProblem[]
+  submissions     Submission[]
+  contestProblems ContestProblem[]
+
+  @@map("problems")
+}
+
+model TestCase {
+  id        Int    @id @default(autoincrement())
+  problemId String @map("problem_id")
+  name      String
+  input     String
+  expected  String
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@map("test_cases")
+}
+
+model SolvedProblem {
+  userId    String   @map("user_id")
+  problemId String   @map("problem_id")
+  solvedAt  DateTime @default(now()) @map("solved_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@id([userId, problemId])
+  @@map("solved_problems")
+}
+
+model Submission {
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  userId       String   @map("user_id")
+  problemId    String   @map("problem_id")
+  problemTitle String   @map("problem_title")
+  language     String
+  verdict      String
+  runtime      Float?
+  memory       Float?
+  sourceCode   String   @map("source_code")
+  submittedAt  DateTime @default(now()) @map("submitted_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([problemId])
+  @@index([submittedAt])
+  @@map("submissions")
+}
+
+// Note: `status` (upcoming/active/ended) is intentionally not a column here —
+// it's computed at read time from startsAt/endsAt and participant completion.
+model Contest {
+  id            String   @id @default(dbgenerated("gen_random_uuid()"))
+  code          String   @unique
+  title         String
+  description   String   @default("")
+  createdBy     String   @map("created_by")
+  createdByName String   @map("created_by_name")
+  startsAt      DateTime @map("starts_at")
+  endsAt        DateTime @map("ends_at")
+  isRandom      Boolean  @default(false) @map("is_random")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  creator      User                 @relation("ContestCreator", fields: [createdBy], references: [id])
+  problems     ContestProblem[]
+  participants ContestParticipant[]
+
+  @@index([startsAt])
+  @@index([endsAt])
+  @@index([createdBy])
+  @@map("contests")
+}
+
+model ContestProblem {
+  contestId String @map("contest_id")
+  problemId String @map("problem_id")
+  title     String
+  position  Int    @default(0)
+
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id])
+
+  @@id([contestId, problemId])
+  @@map("contest_problems")
+}
+
+model ContestParticipant {
+  contestId     String    @map("contest_id")
+  userId        String    @map("user_id")
+  authId        String    @default("") @map("auth_id")
+  name          String
+  score         Int       @default(0)
+  penalty       Int       @default(0)
+  wrongAttempts Int       @default(0) @map("wrong_attempts")
+  finishedAt    DateTime? @map("finished_at")
+
+  contest Contest        @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id])
+  solves  ContestSolve[]
+
+  @@id([contestId, userId])
+  @@index([userId])
+  @@map("contest_participants")
+}
+
+model ContestSolve {
+  contestId String   @map("contest_id")
+  userId    String   @map("user_id")
+  problemId String   @map("problem_id")
+  solvedAt  DateTime @default(now()) @map("solved_at")
+
+  participant ContestParticipant @relation(fields: [contestId, userId], references: [contestId, userId], onDelete: Cascade)
+
+  @@id([contestId, userId, problemId])
+  @@map("contest_solve_timestamps")
+}

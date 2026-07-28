@@ -1,6 +1,9 @@
+// frontend/src/api/problems.ts
 import { API_BASE_URL } from '@/config/api';
+// import type { Problem, ProblemDetail, SubmitResult } from '@/types/problem';
 import type { Problem, ProblemDetail, SubmitResult } from '@/types/problem';
 
+// fetch problems list and problem detail from the backend API
 export async function fetchProblems(): Promise<Problem[]> {
   const res = await fetch(`${API_BASE_URL}/problems`);
   const data = await res.json();
@@ -8,6 +11,7 @@ export async function fetchProblems(): Promise<Problem[]> {
   return data.problems;
 }
 
+// fetch problem detail by id from the backend API
 export async function fetchProblem(id: string): Promise<ProblemDetail> {
   const res = await fetch(`${API_BASE_URL}/problems/${encodeURIComponent(id)}`);
   const data = await res.json();
@@ -15,6 +19,7 @@ export async function fetchProblem(id: string): Promise<ProblemDetail> {
   return data.problem;
 }
 
+// fetch solved problem ids for the current user from the backend API
 export async function fetchSolvedIds(headers: HeadersInit): Promise<string[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/profile/solved`, { headers });
@@ -23,6 +28,7 @@ export async function fetchSolvedIds(headers: HeadersInit): Promise<string[]> {
   } catch { return []; }
 }
 
+// submit code to the backend API for running or submitting
 export async function submitCode(
   payload: {
     problemId: string;
@@ -41,6 +47,7 @@ export async function submitCode(
   return res.json();
 }
 
+// fetch AI-generated hint from the backend API
 export async function fetchAiHint(
   payload: { problemId: string; hintNumber: number; code: string; language: string; elapsedSeconds: number },
   headers: HeadersInit
@@ -54,6 +61,7 @@ export async function fetchAiHint(
   return data.hint || data.error || 'Could not generate hint.';
 }
 
+// fetch AI-generated code review from the backend API
 export async function fetchCodeReview(
   payload: { problemId: string; code: string; language: string },
   headers: HeadersInit

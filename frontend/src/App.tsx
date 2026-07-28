@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
+import OAuthCallback from './pages/OAuthCallback';
 import Problems from './pages/Problems';
 import Editor from './pages/Editor';
 import Calendar from './pages/Calendar';
@@ -14,7 +15,7 @@ import ContestResults from './pages/ContestResults';
 import Dashboard from './pages/Dashboard';
 import Submissions from './pages/Submissions';
 
-const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor'];
+const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor', '/auth/callback'];
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/callback" element={<OAuthCallback />} />
 
           {/* Protected */}
           <Route element={<ProtectedRoute />}>

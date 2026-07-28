@@ -1,3 +1,5 @@
+const { prisma } = require('../config/prismaClient');
+
 function startOfDay(date) {
   const value = new Date(date);
   value.setHours(0, 0, 0, 0);
@@ -40,12 +42,15 @@ function getSubmissionMetrics(results) {
   };
 }
 
+// Mutates `user` in place (matching the pre-existing call sites' expectation
+// that they still need to persist it themselves) — returns the fields that
+// changed so the caller can pass them straight into a Prisma update.
 function updateStreak(user, activityDate = new Date()) {
   const today = startOfDay(activityDate);
   const lastActivity = user.lastActivityDate ? startOfDay(user.lastActivityDate) : null;
 
   if (lastActivity && isSameDay(lastActivity, today)) {
-    return;
+    return false;
   }
 
   const yesterday = new Date(today);
@@ -62,10 +67,15 @@ function updateStreak(user, activityDate = new Date()) {
   }
 
   user.lastActivityDate = today;
+  return true;
 }
 
-function formatProfile(user) {
-  const solvedProblems = user.solvedProblems || [];
+// `solvedCount` is passed in (derived via `prisma.solvedProblem.count(...)`)
+// rather than read off `user` — there's no embedded array anymore, and this
+// keeps formatProfile a pure formatting function with a single source of
+// truth for "how many problems solved" (previously this and the stored
+// `user.problemsSolved` counter could drift from each other).
+function formatProfile(user, solvedCount) {
   const totalSubmissions = user.totalSubmissions || 0;
   const acceptedSubmissions = user.acceptedSubmissions || 0;
   const acceptanceRate = totalSubmissions
@@ -75,7 +85,7 @@ function formatProfile(user) {
   return {
     name: user.name || "",
     email: user.email || "",
-    problemsSolved: solvedProblems.length,
+    problemsSolved: solvedCount,
     totalSubmissions,
     acceptedSubmissions,
     acceptanceRate,
@@ -84,27 +94,14 @@ function formatProfile(user) {
   };
 }
 
-function ensureUserProfileFields(user) {
-  if (!user.solvedProblems) user.solvedProblems = [];
-  if (user.totalSubmissions == null) user.totalSubmissions = 0;
-  if (user.acceptedSubmissions == null) user.acceptedSubmissions = 0;
-  if (user.currentStreak == null) user.currentStreak = 0;
-  if (user.longestStreak == null) user.longestStreak = 0;
-  return user;
-}
-
 function getUserIdFromRequest(req) {
-    // Only ever trust the Firebase-authenticated user set by middleware —
+    // Only ever trust the authenticated user set by middleware —
     // never a client-supplied header/body/query id (that was an IDOR).
-    return req.user ? req.user._id : null;
+    return req.user ? req.user.id : null;
 }
 
 async function loadRequestUser(req, res) {
-    const User = require('../models/users');
-    
-    // If Firebase middleware already loaded the user, use it
     if (req.user) {
-        ensureUserProfileFields(req.user);
         return req.user;
     }
 
@@ -118,7 +115,7 @@ async function loadRequestUser(req, res) {
         return null;
     }
 
-    const user = await User.findById(userId);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
         res.status(404).json({
@@ -128,7 +125,6 @@ async function loadRequestUser(req, res) {
         return null;
     }
 
-    ensureUserProfileFields(user);
     return user;
 }
 
@@ -137,7 +133,6 @@ module.exports = {
   getSubmissionMetrics,
   updateStreak,
   formatProfile,
-  ensureUserProfileFields,
   startOfDay,
   getUserIdFromRequest,
   loadRequestUser

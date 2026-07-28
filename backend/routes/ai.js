@@ -2,8 +2,8 @@
 const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
-const Problem = require('../models/Problem');
-const { verifyFirebaseToken } = require('../middleware/auth');
+const { prisma } = require('../config/prismaClient');
+const { requireAuth } = require('../middleware/auth');
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
@@ -12,10 +12,10 @@ const aiLimiter = rateLimit({
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.firebaseUid || ipKeyGenerator(req.ip)
+    keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
-router.use(verifyFirebaseToken, aiLimiter);
+router.use(requireAuth, aiLimiter);
 
 async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTokens }) {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -52,7 +52,7 @@ router.post('/review', async (req, res) => {
     if (!groqKey) return res.status(503).json({ error: 'AI service not configured' });
 
     try {
-        const problemDoc = await Problem.findOne({ id: problemId }).lean();
+        const problemDoc = await prisma.problem.findUnique({ where: { id: problemId }, include: { testCases: true } });
         if (!problemDoc) return res.status(404).json({ error: 'Problem not found' });
 
         const title       = problemDoc.title || '';
@@ -111,7 +111,7 @@ router.post('/hint', async (req, res) => {
     if (!groqKey) return res.status(503).json({ error: 'AI service not configured' });
 
     try {
-        const problemDoc = await Problem.findOne({ id: problemId }).lean();
+        const problemDoc = await prisma.problem.findUnique({ where: { id: problemId }, include: { testCases: true } });
         if (!problemDoc) return res.status(404).json({ error: 'Problem not found' });
 
         const title       = problemDoc.title || '';

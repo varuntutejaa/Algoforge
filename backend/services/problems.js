@@ -1,28 +1,24 @@
-// Problem document formatting + one-off data migrations.
-const Problem = require('../models/Problem');
+// Problem formatting + one-off data migrations.
+const { prisma } = require('../config/prismaClient');
 
-function formatBoilerplate(boilerplate) {
-    if (!boilerplate) return {};
-    if (boilerplate instanceof Map) {
-        return Object.fromEntries(boilerplate);
-    }
-    return boilerplate;
-}
-
+// `problem` may or may not have `testCases` included (Prisma relation), and
+// `boilerplate` is a plain JSONB object now — no Mongoose Map handling needed.
 function formatProblem(problem) {
-    const doc = problem.toObject ? problem.toObject() : problem;
-
     return {
-        id: doc.id,
-        title: doc.title,
-        difficulty: doc.difficulty,
-        tags: doc.tags,
-        description: doc.description,
-        constraints: doc.constraints,
-        example: doc.example,
-        boilerplate: formatBoilerplate(doc.boilerplate),
-        testCases: doc.testCases,
-        runner: doc.runner || null
+        id: problem.id,
+        title: problem.title,
+        difficulty: problem.difficulty,
+        tags: problem.tags,
+        description: problem.description,
+        constraints: problem.constraints,
+        example: problem.example,
+        boilerplate: problem.boilerplate || {},
+        testCases: (problem.testCases || []).map((tc) => ({
+            name: tc.name,
+            input: tc.input,
+            expected: tc.expected
+        })),
+        runner: problem.runner || null
     };
 }
 
@@ -39,12 +35,16 @@ async function migratePythonBoilerplates() {
         'words-k': 'def solution(words, k):\n    # Write your solution here\n    pass',
     };
     try {
-        const problems = await Problem.find({}).lean();
+        const problems = await prisma.problem.findMany({ select: { id: true, runner: true, boilerplate: true } });
         for (const p of problems) {
-            if (p.boilerplate && !p.boilerplate.get ? !p.boilerplate['python'] : !(p.boilerplate instanceof Map ? p.boilerplate.get('python') : p.boilerplate['python'])) {
+            const boilerplate = p.boilerplate || {};
+            if (!boilerplate.python) {
                 const runnerKey = p.runner || 'array-to-int';
                 const pyBoiler = pythonBoilerplates[runnerKey] || pythonBoilerplates['array-to-int'];
-                await Problem.updateOne({ _id: p._id }, { $set: { 'boilerplate.python': pyBoiler } });
+                await prisma.problem.update({
+                    where: { id: p.id },
+                    data: { boilerplate: { ...boilerplate, python: pyBoiler } }
+                });
                 console.log(`✅ Added Python boilerplate to: ${p.id}`);
             }
         }
@@ -54,7 +54,7 @@ async function migratePythonBoilerplates() {
 }
 
 async function getDailyProblemId() {
-    const problems = await Problem.find().select('id').sort({ createdAt: 1 }).lean();
+    const problems = await prisma.problem.findMany({ select: { id: true }, orderBy: { createdAt: 'asc' } });
     if (!problems.length) return null;
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 0);

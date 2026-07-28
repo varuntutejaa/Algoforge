@@ -1,7 +1,7 @@
 const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
-const Problem = require('../models/Problem');
+const { prisma } = require('../config/prismaClient');
 const { formatProblem } = require('../services/problems');
 const { requireAdminKey } = require('../middleware/adminAuth');
 
@@ -15,10 +15,17 @@ const adminWriteLimiter = rateLimit({
 
 router.get('/', async (req, res) => {
     try {
-        const problems = await Problem.find()
-            .select('id title difficulty tags description testCases')
-            .sort({ createdAt: 1 })
-            .lean();
+        const problems = await prisma.problem.findMany({
+            select: {
+                id: true,
+                title: true,
+                difficulty: true,
+                tags: true,
+                description: true,
+                _count: { select: { testCases: true } }
+            },
+            orderBy: { createdAt: 'asc' }
+        });
 
         res.json({
             success: true,
@@ -28,7 +35,7 @@ router.get('/', async (req, res) => {
                 difficulty: problem.difficulty,
                 tags: problem.tags,
                 summary: problem.description[0] || "",
-                testCaseCount: problem.testCases.length
+                testCaseCount: problem._count.testCases
             }))
         });
     } catch (error) {
@@ -42,7 +49,10 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     try {
-        const problem = await Problem.findOne({ id: req.params.id });
+        const problem = await prisma.problem.findUnique({
+            where: { id: req.params.id },
+            include: { testCases: true }
+        });
 
         if (!problem) {
             return res.status(404).json({
@@ -87,7 +97,7 @@ router.post('/', requireAdminKey, adminWriteLimiter, async (req, res) => {
             });
         }
 
-        const existingProblem = await Problem.findOne({ id });
+        const existingProblem = await prisma.problem.findUnique({ where: { id } });
         if (existingProblem) {
             return res.status(409).json({
                 success: false,
@@ -95,20 +105,23 @@ router.post('/', requireAdminKey, adminWriteLimiter, async (req, res) => {
             });
         }
 
-        const problem = new Problem({
-            id,
-            title,
-            difficulty,
-            tags,
-            description,
-            constraints,
-            example,
-            boilerplate,
-            testCases,
-            runner
+        const problem = await prisma.problem.create({
+            data: {
+                id,
+                title,
+                difficulty,
+                tags,
+                description,
+                constraints,
+                example,
+                boilerplate,
+                runner,
+                testCases: {
+                    create: testCases.map((tc) => ({ name: tc.name, input: tc.input, expected: tc.expected }))
+                }
+            },
+            include: { testCases: true }
         });
-
-        await problem.save();
 
         res.status(201).json({
             success: true,

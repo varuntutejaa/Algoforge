@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const Problem = require('../models/Problem');
-const Submission = require('../models/Submission');
-const { verifyFirebaseToken } = require('../middleware/auth');
-const { formatProfile, ensureUserProfileFields, startOfDay } = require('../utils/profileHelpers');
+const { prisma } = require('../config/prismaClient');
+const { requireAuth } = require('../middleware/auth');
+const { formatProfile, startOfDay } = require('../utils/profileHelpers');
 
-router.get('/', verifyFirebaseToken, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
         const user = req.user;
+        const solvedCount = await prisma.solvedProblem.count({ where: { userId: user.id } });
         res.json({
             success: true,
-            profile: formatProfile(user)
+            profile: formatProfile(user, solvedCount)
         });
     } catch (error) {
         console.log(error);
@@ -21,7 +21,7 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
     }
 });
 
-router.get('/streak', verifyFirebaseToken, async (req, res) => {
+router.get('/streak', requireAuth, async (req, res) => {
     try {
         const user = req.user;
         const today = startOfDay(new Date());
@@ -35,7 +35,7 @@ router.get('/streak', verifyFirebaseToken, async (req, res) => {
         // streak expired — reset DB value so it doesn't linger
         if (!isActive && user.currentStreak > 0) {
             user.currentStreak = 0;
-            await user.save();
+            await prisma.user.update({ where: { id: user.id }, data: { currentStreak: 0 } });
         }
         const currentStreak = isActive ? (user.currentStreak || 0) : 0;
         res.json({ currentStreak, longestStreak: user.longestStreak || 0, solvedToday });
@@ -44,27 +44,23 @@ router.get('/streak', verifyFirebaseToken, async (req, res) => {
     }
 });
 
-router.get('/solved', verifyFirebaseToken, async (req, res) => {
+router.get('/solved', requireAuth, async (req, res) => {
     try {
         const user = req.user;
-        ensureUserProfileFields(user);
-        const solvedIds = user.solvedProblems.map((entry) => entry.problemId);
-        const problems = await Problem.find({ id: { $in: solvedIds } }).lean();
-        const problemMap = new Map(problems.map((problem) => [problem.id, problem]));
+        const solvedRows = await prisma.solvedProblem.findMany({
+            where: { userId: user.id },
+            orderBy: { solvedAt: 'desc' },
+            include: { problem: { select: { title: true, difficulty: true, tags: true } } }
+        });
 
-        const solved = user.solvedProblems
-            .slice()
-            .sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt))
-            .map((entry) => {
-                const problem = problemMap.get(entry.problemId);
-                return {
-                    problemId: entry.problemId,
-                    solvedAt: entry.solvedAt,
-                    title: problem?.title || entry.problemId,
-                    difficulty: problem?.difficulty || "Unknown",
-                    tags: problem?.tags || []
-                };
-            });
+        const solved = solvedRows.map((row) => ({
+            problemId: row.problemId,
+            solvedAt: row.solvedAt,
+            title: row.problem?.title || row.problemId,
+            difficulty: row.problem?.difficulty || "Unknown",
+            tags: row.problem?.tags || []
+        }));
+        const solvedIds = solvedRows.map((row) => row.problemId);
 
         res.json({
             success: true,
@@ -80,24 +76,25 @@ router.get('/solved', verifyFirebaseToken, async (req, res) => {
     }
 });
 
-router.get('/submissions', verifyFirebaseToken, async (req, res) => {
+router.get('/submissions', requireAuth, async (req, res) => {
     try {
         const user = req.user;
-        const filter = { userId: user._id };
+        const where = { userId: user.id };
         const verdict = req.query.verdict;
 
         if (verdict && verdict !== "All") {
-            filter.verdict = verdict;
+            where.verdict = verdict;
         }
 
-        const submissions = await Submission.find(filter)
-            .sort({ submittedAt: -1 })
-            .lean();
+        const submissions = await prisma.submission.findMany({
+            where,
+            orderBy: { submittedAt: 'desc' }
+        });
 
         res.json({
             success: true,
             submissions: submissions.map((submission) => ({
-                id: submission._id.toString(),
+                id: submission.id,
                 problemId: submission.problemId,
                 problemTitle: submission.problemTitle,
                 language: submission.language,
@@ -116,7 +113,7 @@ router.get('/submissions', verifyFirebaseToken, async (req, res) => {
     }
 });
 
-router.get('/activity', verifyFirebaseToken, async (req, res) => {
+router.get('/activity', requireAuth, async (req, res) => {
     try {
         const user = req.user;
         const days = Number(req.query.days) || 365;
@@ -124,29 +121,18 @@ router.get('/activity', verifyFirebaseToken, async (req, res) => {
         startDate.setDate(startDate.getDate() - (days - 1));
         startDate.setHours(0, 0, 0, 0);
 
-        const activity = await Submission.aggregate([
-            {
-                $match: {
-                    userId: user._id,
-                    verdict: "Accepted",
-                    submittedAt: { $gte: startDate }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" }
-                    },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { _id: 1 } }
-        ]);
+        const activity = await prisma.$queryRaw`
+            SELECT to_char(submitted_at, 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+            FROM submissions
+            WHERE user_id = ${user.id} AND verdict = 'Accepted' AND submitted_at >= ${startDate}
+            GROUP BY date
+            ORDER BY date ASC
+        `;
 
         res.json({
             success: true,
             activity: activity.map((entry) => ({
-                date: entry._id,
+                date: entry.date,
                 count: entry.count
             }))
         });
