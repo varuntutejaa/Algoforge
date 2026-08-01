@@ -209,7 +209,7 @@ jobs:
           mkdir -p "$BASE/shared/scripts"
           TMPDIR=$(mktemp -d)
           aws s3 cp "__ARTIFACT_URL__" "$TMPDIR/backend.tar.gz"
-          tar -xzf "$TMPDIR/backend.tar.gz" -C "$TMPDIR" scripts/deploy
+          tar -xzf "$TMPDIR/backend.tar.gz" -C "$TMPDIR" ./scripts/deploy
           cp -r "$TMPDIR/scripts/deploy/." "$BASE/shared/scripts/"
           chmod +x "$BASE"/shared/scripts/*.sh
           bash "$BASE/shared/scripts/release.sh" "__SHA__" "$TMPDIR/backend.tar.gz"
