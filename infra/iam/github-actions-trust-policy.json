@@ -14,7 +14,9 @@
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
             "repo:varuntutejaa/Algoforge:ref:refs/heads/main",
-            "repo:varuntutejaa/Algoforge:ref:refs/heads/develop"
+            "repo:varuntutejaa/Algoforge:ref:refs/heads/develop",
+            "repo:varuntutejaa/Algoforge:environment:production",
+            "repo:varuntutejaa/Algoforge:environment:staging"
           ]
         }
       }
