@@ -3,10 +3,11 @@
 // releases/current/shared layout) and referenced by every release via
 // `pm2 startOrReload shared/ecosystem.config.js`.
 //
-// Cluster mode + multiple instances is what makes `pm2 reload` a zero-downtime
-// operation: PM2 restarts workers one at a time, keeping at least one process
-// serving traffic on the shared port at every moment. This app is a stateless
-// Express API backed by RDS PostgreSQL, so running N instances is safe.
+// Single instance: the box is a t3.micro (1GB RAM), and a cluster reload
+// briefly runs old + new workers side by side — with 2+ instances that spike
+// was enough to stall the whole VM (including the SSM agent) during deploys.
+// Trade-off is a sub-second connection drop on reload instead of zero-downtime;
+// revisit (instances: 2+) if/when the box is upsized.
 module.exports = {
   apps: [
     {
@@ -14,7 +15,7 @@ module.exports = {
       cwd: '/home/ec2-user/backend/current',
       script: 'server.js',
       exec_mode: 'cluster',
-      instances: 2,
+      instances: 1,
       env: {
         NODE_ENV: 'production',
       },
