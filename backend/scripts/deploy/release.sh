@@ -29,6 +29,10 @@ tar -xzf "$TARBALL" -C "$RELEASE_DIR"
 # Secrets live once in shared/, symlinked into every release — never shipped in the artifact.
 ln -sf "$SHARED_DIR/.env" "$RELEASE_DIR/.env"
 
+# PM2 reads its config from shared/ (persists across releases); keep it in sync
+# with whatever ecosystem.config.js shipped in this release's artifact.
+cp "$RELEASE_DIR/ecosystem.config.js" "$SHARED_DIR/ecosystem.config.js"
+
 echo "[release] installing production dependencies"
 (cd "$RELEASE_DIR" && npm ci --omit=dev)
 
