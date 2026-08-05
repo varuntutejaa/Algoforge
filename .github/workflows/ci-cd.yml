@@ -119,6 +119,10 @@ jobs:
         run: npm run audit
 
       - name: Build
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          VITE_COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN }}
         run: npm run build
 
       - name: Upload frontend build artifact
