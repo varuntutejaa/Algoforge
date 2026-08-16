@@ -7,10 +7,4 @@ export default defineConfig({
   resolve: {
     alias: { '@': '/src' },
   },
-  // amazon-cognito-identity-js pulls in the `buffer` polyfill package,
-  // which references Node's `global` at module scope — undefined in a
-  // browser/Vite context without this alias.
-  define: {
-    global: 'globalThis',
-  },
 });

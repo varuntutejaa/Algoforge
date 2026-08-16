@@ -1,4 +1,4 @@
-// Cognito-token-based login/signup: verifies the ID token and returns/creates the user profile.
+// Supabase-token-based login/signup: verifies the access token and returns/creates the user profile.
 const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();

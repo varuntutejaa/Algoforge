@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CognitoUser, CognitoUserAttribute, AuthenticationDetails, type CognitoUserSession } from 'amazon-cognito-identity-js';
-import { userPool, redirectToGoogleSignIn } from '@/config/cognito';
+import { supabase, OAUTH_REDIRECT_URI } from '@/config/supabase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 
@@ -28,14 +27,22 @@ export default function Signup() {
   const navigate = useNavigate();
   const toast = useToast();
   const { login } = useAuth();
-  const [stage, setStage] = useState<'form' | 'confirm'>('form');
+  const [stage, setStage] = useState<'form' | 'sent'>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const strength = useMemo(() => getPasswordStrength(password), [password]);
+
+  async function handleGoogleSignIn() {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: OAUTH_REDIRECT_URI },
+    });
+    if (error) { toast.error(error.message); setLoading(false); }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,63 +52,42 @@ export default function Signup() {
     if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      const attributeList = [new CognitoUserAttribute({ Name: 'name', Value: name.trim() })];
-      await new Promise<void>((resolve, reject) => {
-        userPool.signUp(email.trim(), password, attributeList, [], (err) => {
-          if (err) { reject(err); return; }
-          resolve();
-        });
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { name: name.trim() }, emailRedirectTo: OAUTH_REDIRECT_URI },
       });
-      setStage('confirm');
-      toast.success('Check your email for a verification code.');
-    } catch (err: any) {
-      if (err.code === 'UsernameExistsException') {
-        toast.error('An account with this email already exists.');
-      } else {
-        toast.error(err.message || 'Signup failed');
+      if (error) {
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          toast.error('An account with this email already exists.');
+        } else {
+          toast.error(error.message || 'Signup failed');
+        }
+        return;
       }
-    } finally { setLoading(false); }
-  }
 
-  async function handleConfirm(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code.trim()) { toast.error('Enter the code sent to your email'); return; }
-    setLoading(true);
-    try {
-      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
+      // Email confirmation disabled on the Supabase project → session comes back immediately.
+      if (data.session) {
+        const idToken = data.session.access_token;
+        const res = await backendAuth('signup', idToken, { name: name.trim() });
+        if (!res.success) { toast.error(res.message || 'Signup failed'); return; }
+        login(res.user, idToken);
+        toast.success('Account created!');
+        setTimeout(() => navigate('/problems'), 900);
+        return;
+      }
 
-      await new Promise<void>((resolve, reject) => {
-        cognitoUser.confirmRegistration(code.trim(), true, (err) => {
-          if (err) { reject(err); return; }
-          resolve();
-        });
-      });
-
-      const authDetails = new AuthenticationDetails({ Username: email.trim(), Password: password });
-      const session = await new Promise<CognitoUserSession>((resolve, reject) => {
-        cognitoUser.authenticateUser(authDetails, {
-          onSuccess: (result) => resolve(result),
-          onFailure: (err) => reject(err),
-        });
-      });
-
-      const idToken = session.getIdToken().getJwtToken();
-      const data = await backendAuth('signup', idToken, { name: name.trim() });
-      if (!data.success) { toast.error(data.message || 'Signup failed'); return; }
-      login(data.user, idToken);
-      toast.success('Account created!');
-      setTimeout(() => navigate('/problems'), 900);
+      setStage('sent');
+      toast.success('Check your email to confirm your account.');
     } catch (err: any) {
-      toast.error(err.message || 'Invalid or expired code');
+      toast.error(err.message || 'Signup failed');
     } finally { setLoading(false); }
   }
 
-  function handleResend() {
-    const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
-    cognitoUser.resendConfirmationCode((err) => {
-      if (err) { toast.error(err.message || 'Failed to resend code'); return; }
-      toast.success('Code resent — check your email.');
-    });
+  async function handleResend() {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    if (error) { toast.error(error.message || 'Failed to resend'); return; }
+    toast.success('Confirmation email resent.');
   }
 
   return (
@@ -113,15 +99,15 @@ export default function Signup() {
               <img src="/assets/algoforge_favicon_themed.svg" alt="AlgoForge" style={{ width: 32, height: 32 }} />
               <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
             </Link>
-            <h2 className="form-title">{stage === 'form' ? 'Create account' : 'Verify your email'}</h2>
+            <h2 className="form-title">{stage === 'form' ? 'Create account' : 'Check your email'}</h2>
             <p className="form-sub">
-              {stage === 'form' ? 'Join AlgoForge and start competing.' : <>We sent a code to <strong>{email}</strong>.</>}
+              {stage === 'form' ? 'Join AlgoForge and start competing.' : <>We sent a confirmation link to <strong>{email}</strong>.</>}
             </p>
           </div>
 
           {stage === 'form' && (
             <>
-              <button type="button" className="oauth-btn" onClick={redirectToGoogleSignIn} disabled={loading}>
+              <button type="button" className="oauth-btn" onClick={handleGoogleSignIn} disabled={loading}>
                 <svg width="18" height="18" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -184,26 +170,14 @@ export default function Signup() {
               </button>
             </form>
           ) : (
-            <form className="signup-form" onSubmit={handleConfirm} noValidate>
-              <div className="field-group">
-                <label className="field-label">Verification Code</label>
-                <div className="field-wrap">
-                  <input type="text" inputMode="numeric" className="field-input" placeholder="123456" value={code}
-                    onChange={e => setCode(e.target.value)} autoComplete="one-time-code" />
-                </div>
-              </div>
-
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Verifying…' : 'Verify & Continue'}
-              </button>
-
+            <div className="signup-form">
               <p className="signup-prompt">
-                Didn't get a code?{' '}
+                Didn't get it?{' '}
                 <button type="button" className="signup-link" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={handleResend}>
                   Resend
                 </button>
               </p>
-            </form>
+            </div>
           )}
 
           <p className="signup-prompt">

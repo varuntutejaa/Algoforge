@@ -1,40 +1,39 @@
-const { CognitoJwtVerifier } = require("aws-jwt-verify");
+const { createRemoteJWKSet, jwtVerify } = require("jose");
 const { prisma } = require("../config/prismaClient");
 
-// Verifies Cognito ID tokens. The User Pool ID encodes its own region, so
-// aws-jwt-verify derives the JWKS issuer URL from it directly — no separate
-// region config needed here.
-//
-// CognitoJwtVerifier.create() parses userPoolId eagerly and throws if it's
-// missing/malformed, so this is guarded the same way the old firebase-admin
-// init was — a misconfigured/not-yet-provisioned pool degrades auth-gated
-// routes to a clear 503 instead of crashing the whole process at require time.
-let verifier = null;
+// Supabase signs access tokens with a per-project ES256 key, published at a
+// public JWKS endpoint — no shared secret to configure. jose's
+// createRemoteJWKSet caches the key set and re-fetches on a kid it hasn't
+// seen, so key rotation on Supabase's side doesn't need a redeploy here.
+let jwks = null;
+let issuer = null;
 let initError = null;
 
 try {
-  if (!process.env.COGNITO_USER_POOL_ID || !process.env.COGNITO_CLIENT_ID) {
-    throw new Error("COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID are not set");
+  if (!process.env.SUPABASE_URL) {
+    throw new Error("SUPABASE_URL is not set");
   }
-  verifier = CognitoJwtVerifier.create({
-    userPoolId: process.env.COGNITO_USER_POOL_ID,
-    tokenUse: "id",
-    clientId: process.env.COGNITO_CLIENT_ID,
-  });
+  issuer = `${process.env.SUPABASE_URL}/auth/v1`;
+  jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 } catch (error) {
   initError = error.message;
-  console.error("Cognito verifier not initialized:", initError);
+  console.error("Supabase JWKS not initialized:", initError);
+}
+
+function extractName(payload) {
+  const meta = payload.user_metadata || {};
+  return meta.name || meta.full_name || (payload.email || "").split("@")[0] || "User";
 }
 
 async function findOrCreateUser(payload) {
   const authId = payload.sub;
   const email = payload.email || "";
-  const name = payload.name || email.split("@")[0] || "User";
+  const name = extractName(payload);
 
   return prisma.user.upsert({
     where: { authId },
     update: { email, ...(name ? { name } : {}) },
-    create: { authId, email, name, profilePicture: "" },
+    create: { authId, email, name, profilePicture: payload.user_metadata?.avatar_url || "" },
   });
 }
 
@@ -44,8 +43,8 @@ async function findOrCreateUser(payload) {
 async function requireAuth(req, res, next) {
   if (req.user) return next();
 
-  if (!verifier) {
-    console.error("requireAuth: Cognito verifier not initialized:", initError);
+  if (!jwks) {
+    console.error("requireAuth: Supabase JWKS not initialized:", initError);
     return res.status(503).json({
       success: false,
       message: "Authentication service is unavailable. Server misconfiguration.",
@@ -58,17 +57,17 @@ async function requireAuth(req, res, next) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Missing or invalid Authorization header. Use: Bearer <id-token>",
+        message: "Missing or invalid Authorization header. Use: Bearer <access-token>",
       });
     }
 
-    const idToken = authHeader.split(" ")[1];
-    const payload = await verifier.verify(idToken);
+    const token = authHeader.split(" ")[1];
+    const { payload } = await jwtVerify(token, jwks, { issuer, audience: "authenticated" });
 
     req.user = await findOrCreateUser(payload);
     next();
   } catch (error) {
-    console.error("Cognito token verification failed:", error.message);
+    console.error("Supabase token verification failed:", error.message);
 
     return res.status(401).json({
       success: false,
@@ -81,7 +80,7 @@ async function requireAuth(req, res, next) {
  * Middleware: optionalAuth
  */
 async function optionalAuth(req, res, next) {
-  if (!verifier) {
+  if (!jwks) {
     req.user = null;
     return next();
   }
@@ -94,8 +93,8 @@ async function optionalAuth(req, res, next) {
       return next();
     }
 
-    const idToken = authHeader.split(" ")[1];
-    const payload = await verifier.verify(idToken);
+    const token = authHeader.split(" ")[1];
+    const { payload } = await jwtVerify(token, jwks, { issuer, audience: "authenticated" });
 
     req.user = await findOrCreateUser(payload);
     next();

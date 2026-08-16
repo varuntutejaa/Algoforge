@@ -1,7 +1,9 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ProtectedRoute() {
-  return localStorage.getItem('algoforge-auth') === 'true'
-    ? <Outlet />
-    : <Navigate to="/login" replace />;
+  const { idToken, loading } = useAuth();
+
+  if (loading) return null;
+  return idToken ? <Outlet /> : <Navigate to="/login" replace />;
 }

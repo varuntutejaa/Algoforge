@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CognitoUser, CognitoIdToken, CognitoAccessToken, CognitoRefreshToken, CognitoUserSession } from 'amazon-cognito-identity-js';
-import { userPool, exchangeCodeForTokens } from '@/config/cognito';
+import { supabase } from '@/config/supabase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 
-/** Lands here after Cognito's Hosted UI hands control back post-Google-login.
- * Exchanges the auth code for tokens, wires up a CognitoUserSession the same
- * way a direct SRP login would (so the existing refresh-on-focus logic in
- * AuthContext works identically regardless of how the user signed in). */
+/** Lands here after Google OAuth or an email-confirmation/recovery link hands
+ * control back. The Supabase client auto-detects the session token in the
+ * URL and fires onAuthStateChange — we just wait for that, then sync the
+ * profile with our backend the same way a direct password login would. */
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -16,37 +15,37 @@ export default function OAuthCallback() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    (async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const oauthError = params.get('error');
+    const params = new URLSearchParams(window.location.search || window.location.hash.replace('#', '?'));
+    const oauthError = params.get('error') || params.get('error_description');
+    if (oauthError) { setError(oauthError); return; }
 
-      if (oauthError) { setError('Google sign-in was cancelled or failed.'); return; }
-      if (!code) { setError('Missing authorization code.'); return; }
+    let settled = false;
 
+    async function sync(idToken: string) {
+      if (settled) return;
+      settled = true;
       try {
-        const tokens = await exchangeCodeForTokens(code);
-
-        const idToken = new CognitoIdToken({ IdToken: tokens.id_token });
-        const accessToken = new CognitoAccessToken({ AccessToken: tokens.access_token });
-        const refreshToken = new CognitoRefreshToken({ RefreshToken: tokens.refresh_token });
-        const session = new CognitoUserSession({ IdToken: idToken, AccessToken: accessToken, RefreshToken: refreshToken });
-
-        const username = idToken.payload['cognito:username'] || idToken.payload['sub'];
-        const cognitoUser = new CognitoUser({ Username: username, Pool: userPool });
-        cognitoUser.setSignInUserSession(session);
-
-        const jwt = idToken.getJwtToken();
-        const data = await backendAuth('login', jwt, { name: idToken.payload.name || '' });
-        if (!data.success) { setError(data.message || 'Sign-in failed'); return; }
-
-        login(data.user, jwt);
+        const res = await backendAuth('login', idToken);
+        if (!res.success) { setError(res.message || 'Sign-in failed'); return; }
+        login(res.user, idToken);
         toast.success('Welcome!');
         navigate('/problems');
       } catch (err: any) {
         setError(err.message || 'Sign-in failed');
       }
-    })();
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) sync(session.access_token);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) sync(session.access_token);
+    });
+
+    const timeout = setTimeout(() => { if (!settled) setError('Sign-in timed out. Please try again.'); }, 10000);
+
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,19 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CognitoUser } from 'amazon-cognito-identity-js';
-import { userPool } from '@/config/cognito';
+import { supabase } from '@/config/supabase';
 import { useToast } from '@/hooks/useToast';
 import { API_BASE_URL } from '@/config/api';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const toast = useToast();
-  const [stage, setStage] = useState<'email' | 'reset'>('email');
+  const [stage, setStage] = useState<'email' | 'sent' | 'reset'>('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Supabase fires this once the recovery link's token lands in the URL and
+  // establishes a temporary session scoped to the password-update call below.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setStage('reset');
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,40 +38,32 @@ export default function ForgotPassword() {
         return;
       }
 
-      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
-      await new Promise<void>((resolve, reject) => {
-        cognitoUser.forgotPassword({
-          onSuccess: () => resolve(),
-          onFailure: (err) => reject(err),
-        });
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/forgot-password`,
       });
+      if (error) { toast.error(error.message || 'Failed to send reset link'); return; }
 
-      setStage('reset');
-      toast.success('Check your email for a reset code.');
+      setStage('sent');
+      toast.success('Check your email for a reset link.');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send reset code');
+      toast.error(err.message || 'Failed to send reset link');
     } finally { setLoading(false); }
   }
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
-    if (!code.trim()) { toast.error('Enter the code sent to your email'); return; }
     if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
     if (newPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
-      await new Promise<void>((resolve, reject) => {
-        cognitoUser.confirmPassword(code.trim(), newPassword, {
-          onSuccess: () => resolve(),
-          onFailure: (err) => reject(err),
-        });
-      });
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) { toast.error(error.message || 'Failed to reset password'); return; }
 
+      await supabase.auth.signOut();
       toast.success('Password reset — sign in with your new password.');
       setTimeout(() => navigate('/login'), 900);
     } catch (err: any) {
-      toast.error(err.message || 'Invalid or expired code');
+      toast.error(err.message || 'Failed to reset password');
     } finally { setLoading(false); }
   }
 
@@ -79,11 +78,13 @@ export default function ForgotPassword() {
             </Link>
             <h2 className="form-title">Reset password</h2>
             <p className="form-sub">
-              {stage === 'email' ? "We'll send a reset code to your email." : <>Enter the code sent to <strong>{email}</strong>.</>}
+              {stage === 'email' && "We'll send a reset link to your email."}
+              {stage === 'sent' && <>Check <strong>{email}</strong> for the reset link.</>}
+              {stage === 'reset' && 'Choose a new password.'}
             </p>
           </div>
 
-          {stage === 'email' ? (
+          {stage === 'email' && (
             <form onSubmit={handleSubmit} noValidate>
               <div className="field-group">
                 <label className="field-label">Email</label>
@@ -93,18 +94,13 @@ export default function ForgotPassword() {
                 </div>
               </div>
               <button type="submit" className="submit-btn" disabled={loading} style={{ marginTop: 8 }}>
-                {loading ? 'Sending…' : 'Send Reset Code'}
+                {loading ? 'Sending…' : 'Send Reset Link'}
               </button>
             </form>
-          ) : (
+          )}
+
+          {stage === 'reset' && (
             <form onSubmit={handleReset} noValidate>
-              <div className="field-group">
-                <label className="field-label">Reset Code</label>
-                <div className="field-wrap">
-                  <input type="text" inputMode="numeric" className="field-input" placeholder="123456"
-                    value={code} onChange={e => setCode(e.target.value)} autoComplete="one-time-code" />
-                </div>
-              </div>
               <div className="field-group">
                 <label className="field-label">New Password</label>
                 <div className="field-wrap">

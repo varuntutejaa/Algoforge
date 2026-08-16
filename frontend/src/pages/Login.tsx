@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CognitoUser, AuthenticationDetails, type CognitoUserSession } from 'amazon-cognito-identity-js';
-import { userPool, redirectToGoogleSignIn } from '@/config/cognito';
+import { supabase, OAUTH_REDIRECT_URI } from '@/config/supabase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { IconEye, IconEyeOff } from '@/components/ui/Icons';
@@ -28,35 +27,43 @@ export default function Login() {
     return !Object.keys(e).length;
   }
 
+  async function handleGoogleSignIn() {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: OAUTH_REDIRECT_URI },
+    });
+    if (error) { toast.error(error.message); setLoading(false); }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
     try {
-      const cognitoUser = new CognitoUser({ Username: email.trim(), Pool: userPool });
-      const authDetails = new AuthenticationDetails({ Username: email.trim(), Password: password });
-
-      const session = await new Promise<CognitoUserSession>((resolve, reject) => {
-        cognitoUser.authenticateUser(authDetails, {
-          onSuccess: (result) => resolve(result),
-          onFailure: (err) => reject(err),
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          toast.error('Please confirm your email first — check your inbox for the link.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          toast.error('Incorrect email or password.');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
 
-      const idToken = session.getIdToken().getJwtToken();
-      const data = await backendAuth('login', idToken);
-      if (!data.success) { toast.error(data.message || 'Login failed'); return; }
-      login(data.user, idToken);
+      const idToken = data.session.access_token;
+      const res = await backendAuth('login', idToken);
+      if (!res.success) { toast.error(res.message || 'Login failed'); return; }
+      login(res.user, idToken);
       toast.success('Welcome back!');
       setTimeout(() => navigate('/problems'), 800);
     } catch (err: any) {
-      if (err.code === 'UserNotConfirmedException') {
-        toast.error('Please confirm your email first — sign up again to resend the code.');
-      } else if (err.code === 'NotAuthorizedException') {
-        toast.error('Incorrect email or password.');
-      } else {
-        toast.error(err.message || 'Login failed');
-      }
+      toast.error(err.message || 'Login failed');
     } finally { setLoading(false); }
   }
 
@@ -73,7 +80,7 @@ export default function Login() {
             <p className="form-sub">Welcome back to AlgoForge.</p>
           </div>
 
-          <button type="button" className="oauth-btn" onClick={redirectToGoogleSignIn} disabled={loading}>
+          <button type="button" className="oauth-btn" onClick={handleGoogleSignIn} disabled={loading}>
             <svg width="18" height="18" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
