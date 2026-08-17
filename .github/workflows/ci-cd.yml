@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -7,22 +7,15 @@ on:
     branches: [main, develop]
   workflow_dispatch: {}
 
-# One deploy pipeline per branch at a time — a second push queues behind the
-# first rather than racing it or cancelling a deploy that's already underway.
 concurrency:
-  group: ci-cd-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
   NODE_VERSION: "22"
-  AWS_REGION: ap-south-1
-  DEPLOY_ROLE_ARN: arn:aws:iam::472888338171:role/AlgoForgeGitHubActionsRole
-  ARTIFACTS_BUCKET: algoforge-deploy-artifacts-472888338171
-  ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-  IS_DEPLOY: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   # ------------------------------------------------------------------
@@ -52,7 +45,8 @@ jobs:
           ignore-unfixed: true
 
   # ------------------------------------------------------------------
-  # Backend CI
+  # Backend CI — deploys itself via Render's GitHub auto-deploy on push
+  # to main (render.yaml blueprint), not from this workflow.
   # ------------------------------------------------------------------
   ci-backend:
     name: Backend CI (lint, test, audit)
@@ -88,7 +82,8 @@ jobs:
           echo "### Backend CI: lint + test + audit ran for \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ------------------------------------------------------------------
-  # Frontend CI (build output feeds deploy-frontend later)
+  # Frontend CI — deployed separately via `vercel --prod` (not yet wired
+  # to GitHub auto-deploy from this workflow).
   # ------------------------------------------------------------------
   ci-frontend:
     name: Frontend CI (lint, test, audit, build)
@@ -120,292 +115,11 @@ jobs:
 
       - name: Build
         env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
-          VITE_COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN }}
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: npm run build
-
-      - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-dist-${{ github.sha }}
-          path: frontend/dist
-          retention-days: 7
 
       - name: Job summary
         if: always()
         run: |
           echo "### Frontend CI: lint + test + audit + build ran for \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
-
-  # ------------------------------------------------------------------
-  # Package the backend ONCE here; the exact same tarball is what gets
-  # deployed — nothing is rebuilt on EC2, only `npm ci --omit=dev` runs there
-  # (native deps must still be installed on the target's own architecture).
-  # ------------------------------------------------------------------
-  package-backend:
-    name: Package backend artifact
-    needs: [ci-backend]
-    if: ${{ github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Create backend tarball (source only — no node_modules, no .git)
-        working-directory: backend
-        run: |
-          tar -czf "$RUNNER_TEMP/backend-${{ github.sha }}.tar.gz" \
-            --exclude='node_modules' \
-            --exclude='tests' \
-            .
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Upload artifact to S3
-        run: |
-          aws s3 cp "$RUNNER_TEMP/backend-${{ github.sha }}.tar.gz" \
-            "s3://${{ env.ARTIFACTS_BUCKET }}/backend/${{ github.sha }}.tar.gz"
-
-  # ------------------------------------------------------------------
-  # Deploy backend first (see docs/DEPLOYMENT.md #5 — deploying backend
-  # before frontend means any brief version-skew window is "new backend,
-  # old cached frontend", which is the safer direction to be backward
-  # compatible in). Health-gated with automatic rollback inside release.sh.
-  # ------------------------------------------------------------------
-  deploy-backend:
-    name: Deploy backend (${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }})
-    needs: [ci-backend, ci-frontend, security-scan, package-backend]
-    if: ${{ github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy via SSM (versioned release, atomic symlink swap, auto-rollback on failed health check)
-        run: |
-          set -euo pipefail
-          INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"
-          SHA="${{ github.sha }}"
-          ARTIFACT_URL="s3://${{ env.ARTIFACTS_BUCKET }}/backend/${SHA}.tar.gz"
-
-          # Build the remote script as a real file, substitute placeholders,
-          # then hand it to `aws ssm send-command` via a JSON params file —
-          # far more robust than trying to shell-quote a multi-line script
-          # into the CLI's `commands=[...]` shorthand syntax.
-          cat > "$RUNNER_TEMP/remote-deploy.sh" <<'REMOTE'
-          set -euo pipefail
-          BASE=/home/ec2-user/backend
-          mkdir -p "$BASE/shared/scripts"
-          TMPDIR=$(mktemp -d)
-          aws s3 cp "__ARTIFACT_URL__" "$TMPDIR/backend.tar.gz"
-          tar -xzf "$TMPDIR/backend.tar.gz" -C "$TMPDIR" ./scripts/deploy
-          cp -r "$TMPDIR/scripts/deploy/." "$BASE/shared/scripts/"
-          chmod +x "$BASE"/shared/scripts/*.sh
-          bash "$BASE/shared/scripts/release.sh" "__SHA__" "$TMPDIR/backend.tar.gz"
-          REMOTE
-
-          sed -i "s|__ARTIFACT_URL__|$ARTIFACT_URL|g; s|__SHA__|$SHA|g" "$RUNNER_TEMP/remote-deploy.sh"
-
-          node -e '
-            const fs = require("fs");
-            const script = fs.readFileSync(process.argv[1], "utf8");
-            fs.writeFileSync(process.argv[2], JSON.stringify({ commands: [script] }));
-          ' "$RUNNER_TEMP/remote-deploy.sh" "$RUNNER_TEMP/ssm-params.json"
-
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy AlgoForge backend ${SHA} (${{ env.ENVIRONMENT }})" \
-            --parameters "file://$RUNNER_TEMP/ssm-params.json" \
-            --query "Command.CommandId" --output text)
-          echo "SSM command id: $COMMAND_ID"
-
-          for i in $(seq 1 40); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-              --query "Status" --output text 2>/dev/null || echo "Pending")
-            echo "Status: $STATUS"
-            if [ "$STATUS" = "Success" ]; then exit 0; fi
-            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo "::error::Backend deploy failed — release.sh auto-rolled back on the box. Output:"
-              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-                --query "StandardOutputContent" --output text
-              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-                --query "StandardErrorContent" --output text >&2
-              exit 1
-            fi
-            sleep 6
-          done
-          echo "::error::Timed out waiting for SSM command"
-          exit 1
-
-      - name: External health check (through the internet, not just localhost on the box)
-        run: |
-          bash -c '
-            for i in $(seq 1 10); do
-              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${{ vars.BACKEND_PUBLIC_URL }}/health" || echo 000)
-              echo "attempt $i: HTTP $code"
-              [ "$code" = "200" ] && exit 0
-              sleep 5
-            done
-            echo "::error::External health check never returned 200"
-            exit 1
-          '
-
-  # ------------------------------------------------------------------
-  # Deploy frontend only after the backend is confirmed healthy (job
-  # dependency below enforces this ordering).
-  # ------------------------------------------------------------------
-  deploy-frontend:
-    name: Deploy frontend (${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }})
-    needs: [deploy-backend]
-    if: ${{ github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: frontend-dist-${{ github.sha }}
-          path: dist
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Sync hashed assets with long-lived immutable cache headers
-        run: |
-          aws s3 sync dist "s3://${{ vars.S3_BUCKET }}" \
-            --delete \
-            --exclude "index.html" \
-            --cache-control "public, max-age=31536000, immutable"
-
-      - name: Sync index.html with no-cache (must always revalidate)
-        run: |
-          aws s3 cp dist/index.html "s3://${{ vars.S3_BUCKET }}/index.html" \
-            --cache-control "no-cache, no-store, must-revalidate"
-
-      - name: Save a copy of this build for rollback reference
-        run: |
-          aws s3 sync dist "s3://${{ env.ARTIFACTS_BUCKET }}/frontend/${{ github.sha }}/"
-
-      - name: Invalidate CloudFront (only the paths that actually need it — hashed assets never change)
-        id: invalidate
-        run: |
-          INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
-            --paths "/index.html" "/" \
-            --query "Invalidation.Id" --output text)
-          echo "invalidation_id=$INVALIDATION_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for invalidation to complete
-        run: |
-          aws cloudfront wait invalidation-completed \
-            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
-            --id "${{ steps.invalidate.outputs.invalidation_id }}"
-
-  # ------------------------------------------------------------------
-  # Final end-to-end verification once both halves are live.
-  # ------------------------------------------------------------------
-  verify:
-    name: Post-deploy verification
-    needs: [deploy-backend, deploy-frontend]
-    if: ${{ github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-    steps:
-      - name: Check backend health + version
-        run: |
-          BODY=$(curl -fsS "${{ vars.BACKEND_PUBLIC_URL }}/health")
-          echo "$BODY"
-          echo "$BODY" | grep -q "\"status\":\"ok\"" || { echo "::error::backend not healthy"; exit 1; }
-          echo "$BODY" | grep -q "\"${{ github.sha }}\"" || { echo "::error::backend did not report the expected version"; exit 1; }
-
-      - name: Check frontend responds
-        run: |
-          curl -fsS -o /dev/null "https://${{ vars.CLOUDFRONT_DOMAIN }}/"
-
-      - name: Summary
-        run: |
-          {
-            echo "### Deployment verified — ${{ env.ENVIRONMENT }}"
-            echo "- Commit: \`${{ github.sha }}\`"
-            echo "- Backend:  ${{ vars.BACKEND_PUBLIC_URL }}/health"
-            echo "- Frontend: https://${{ vars.CLOUDFRONT_DOMAIN }}/"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # ------------------------------------------------------------------
-  # Notify — always runs (even on failure/rollback) so the outcome is
-  # never silent.
-  # ------------------------------------------------------------------
-  notify:
-    name: Notify
-    needs: [security-scan, ci-backend, ci-frontend, package-backend, deploy-backend, deploy-frontend, verify]
-    if: ${{ always() && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Compute status
-        id: status
-        run: |
-          if [ "${{ needs.verify.result }}" = "success" ]; then
-            echo "status=success" >> "$GITHUB_OUTPUT"
-            echo "emoji=✅" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.deploy-backend.result }}" = "failure" ] || [ "${{ needs.deploy-frontend.result }}" = "failure" ]; then
-            echo "status=rolled_back_or_failed" >> "$GITHUB_OUTPUT"
-            echo "emoji=🔁" >> "$GITHUB_OUTPUT"
-          else
-            echo "status=failure" >> "$GITHUB_OUTPUT"
-            echo "emoji=❌" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Send Slack notification
-        if: ${{ vars.SLACK_WEBHOOK_CONFIGURED == 'true' }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          EMOJI: ${{ steps.status.outputs.emoji }}
-          STATUS: ${{ steps.status.outputs.status }}
-          ENVIRONMENT: ${{ env.ENVIRONMENT }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          AUTHOR: ${{ github.actor }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          curl -fsS -X POST -H 'Content-type: application/json' --data "$(node -e '
-            const payload = {
-              text: `${process.env.EMOJI} AlgoForge deploy — ${process.env.STATUS}`,
-              blocks: [
-                { type: "section", text: { type: "mrkdwn",
-                  text: `${process.env.EMOJI} *AlgoForge deploy — ${process.env.STATUS}*\n` +
-                        `*Environment:* ${process.env.ENVIRONMENT}\n` +
-                        `*Branch:* ${process.env.BRANCH}\n` +
-                        `*Commit:* ${process.env.SHA}\n` +
-                        `*Author:* ${process.env.AUTHOR}\n` +
-                        `*Run:* <${process.env.RUN_URL}|View on GitHub Actions>`
-                }}
-              ]
-            };
-            console.log(JSON.stringify(payload));
-          ')" "$SLACK_WEBHOOK_URL"
