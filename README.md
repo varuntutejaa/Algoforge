@@ -6,10 +6,10 @@
 
 **A competitive programming platform built for real contest experience.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-djpb60zs17m9t.cloudfront.net-4f8ef7?style=flat-square&logo=amazonaws&logoColor=white)](https://djpb60zs17m9t.cloudfront.net)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-frontend--xi--orpin--21.vercel.app-000000?style=flat-square&logo=vercel&logoColor=white)](https://frontend-xi-orpin-21.vercel.app)
 [![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RDS-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://aws.amazon.com/rds/postgresql/)
+[![Supabase](https://img.shields.io/badge/Postgres-Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
 
 </div>
 
@@ -30,7 +30,7 @@ Scoring system         — +100 per accepted, −10 per wrong attempt
 AI Assist              — Time-locked hints + code review (Groq / Llama 3.3 70B)
 Auto-save              — Code persisted per problem per language
 Dashboard               — Heatmap, streaks, difficulty & topic breakdown
-Auth                    — Email/password via AWS Cognito, email verification on signup
+Auth                    — Email/password + Google OAuth via Supabase Auth
 ```
 
 ---
@@ -42,11 +42,11 @@ Auth                    — Email/password via AWS Cognito, email verification o
 | Frontend   | React 19 · TypeScript · Vite · Tailwind CSS     |
 | Editor     | Monaco Editor                                   |
 | Backend    | Node.js · Express                               |
-| Database   | AWS RDS PostgreSQL (Prisma)                     |
-| Auth       | AWS Cognito (User Pool + JWT verification)      |
-| Judge      | Judge0 API (code execution)                     |
+| Database   | Supabase PostgreSQL (Prisma)                    |
+| Auth       | Supabase Auth (email/password + Google OAuth, JWKS-verified) |
+| Judge      | Judge0 API (code execution, parallel per-test-case grading) |
 | AI         | Groq API (Llama 3.3 70B)                        |
-| Deploy     | AWS — EC2 (API) · CloudFront + S3 (frontend)    |
+| Deploy     | Vercel (frontend) · Render (backend)            |
 
 ---
 
@@ -59,7 +59,7 @@ AlgoForge/
 │   ├── prisma/            # schema.prisma (Postgres schema) + migrations
 │   ├── routes/            # Express routers (auth, problems, contests, submissions, profile, ai, health)
 │   ├── services/          # Judge0 runner glue, problem formatting
-│   ├── middleware/        # Cognito token verification
+│   ├── middleware/        # Supabase JWT verification (public JWKS, no shared secret)
 │   ├── utils/             # Profile helpers
 │   └── server.js          # Entry point
 │
@@ -68,7 +68,7 @@ AlgoForge/
     └── src/
         ├── api/           # fetch wrappers per resource
         ├── components/    # Layout + shared UI
-        ├── config/        # API base URL
+        ├── config/        # API base URL, Supabase client
         ├── context/       # AuthContext
         ├── hooks/         # useToast, etc.
         ├── pages/         # Route-level views (Dashboard, Editor, Contests, ...)
@@ -91,7 +91,7 @@ Leaderboard is sorted by **total score** descending. Tiebreaker: fewer wrong att
 
 ## Running Locally
 
-**Prerequisites:** Node.js 20+, a PostgreSQL database (e.g. AWS RDS) URI, an AWS Cognito User Pool (see `infra/setup/create-cognito-user-pool.sh`), Judge0 API key, Groq API key
+**Prerequisites:** Node.js 22+, a [Supabase](https://supabase.com) project (Postgres + Auth), Judge0 API key (optional — defaults to the public CE instance), Groq API key
 
 ```bash
 # 1. Clone
@@ -109,6 +109,7 @@ node server.js         # runs on :8000
 # 3. Frontend
 cd ../frontend
 npm install
+cp .env.example .env   # fill in your Supabase project URL + anon key
 npm run dev             # runs on :5173, calls http://localhost:8000 directly
 ```
 
@@ -116,13 +117,19 @@ npm run dev             # runs on :5173, calls http://localhost:8000 directly
 
 ```env
 DATABASE_URL=
-COGNITO_USER_POOL_ID=
-COGNITO_CLIENT_ID=
+SUPABASE_URL=
 JUDGE0_URL=
 JUDGE0_API_KEY=
 GROQ_API_KEY=
 ADMIN_API_KEY=
 CORS_ORIGINS=
+```
+
+### Required frontend environment variables (`frontend/.env`)
+
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
 The API base URL (local vs. production) is in `frontend/src/config/api.ts`.
@@ -131,9 +138,10 @@ The API base URL (local vs. production) is in `frontend/src/config/api.ts`.
 
 ## Deployment
 
-- **Frontend** — built with `vite build`, served from an S3 bucket behind a CloudFront distribution (HTTPS via CloudFront's default certificate; SPA routing handled via custom 403/404 → `index.html` responses).
-- **Backend** — runs on a single EC2 instance under PM2, behind an nginx reverse proxy, fronted by a second CloudFront distribution for HTTPS termination.
-- **Database** — AWS RDS PostgreSQL, in the same VPC as the backend EC2 instance (not publicly accessible).
+- **Frontend** — deployed to [Vercel](https://vercel.com) (`vercel --prod`), built with `vite build`. `frontend/vercel.json` handles SPA routing (all paths rewrite to `index.html`).
+- **Backend** — deployed to [Render](https://render.com) as a Blueprint service, driven by `render.yaml` at the repo root; auto-deploys on push to `main`.
+- **Database & Auth** — [Supabase](https://supabase.com) Postgres (accessed via the connection pooler — the direct endpoint is IPv6-only) and Supabase Auth (email/password + Google OAuth, verified backend-side against Supabase's public JWKS).
+- **CI** — GitHub Actions (`.github/workflows/ci-cd.yml`) runs lint/test/audit/build on every push and PR; it doesn't deploy anything itself, since Render and Vercel each deploy independently.
 
 ---
 
