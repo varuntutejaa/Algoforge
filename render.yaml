@@ -15,7 +15,7 @@ services:
       - key: JUDGE0_URL
         value: https://ce.judge0.com
       - key: CORS_ORIGINS
-        value: http://localhost:5173,http://127.0.0.1:5173,https://djpb60zs17m9t.cloudfront.net
+        value: http://localhost:5173,http://127.0.0.1:5173,https://djpb60zs17m9t.cloudfront.net,https://frontend-xi-orpin-21.vercel.app
       # Secrets — filled in during "New Blueprint" setup in the Render dashboard,
       # not stored in this file.
       - key: DATABASE_URL
