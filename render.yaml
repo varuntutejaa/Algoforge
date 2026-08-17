@@ -9,7 +9,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: 22.11.0
+        value: 22.14.0
       - key: SUPABASE_URL
         value: https://aqhbkduywhftcfndksff.supabase.co
       - key: JUDGE0_URL
