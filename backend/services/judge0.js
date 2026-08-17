@@ -1009,10 +1009,15 @@ async function runTestSuite(problem, language, sourceCode) {
         return { ready: false, results: [], passed: false };
     }
 
-    const results = [];
-    for (const testCase of problem.testCases) {
-        results.push(await runJudge0Submission(problem, language, sourceCode, testCase));
-    }
+    // Each test case is an independent Judge0 submission (same source, different
+    // stdin) — running them in parallel instead of one-at-a-time cuts total wait
+    // roughly N-fold on Judge0's public CE instance, which has real per-call
+    // latency (compile + queue + execute). Promise.all preserves input order
+    // regardless of completion order, so `results` still lines up with the
+    // problem's test cases.
+    const results = await Promise.all(
+        problem.testCases.map((testCase) => runJudge0Submission(problem, language, sourceCode, testCase))
+    );
 
     return { ready: true, results, passed: results.every((result) => result.passed) };
 }
