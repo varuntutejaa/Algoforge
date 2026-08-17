@@ -153,6 +153,60 @@ function buildTwoSumJudgeSource(language, sourceCode) {
 
 function buildGenericRunner(runnerType, language, sourceCode) {
     const runners = {
+        "two-ints-to-int": {
+            c: (src) => [
+                '#include <stdio.h>',
+                '',
+                src,
+                '',
+                'int main() {',
+                '    int a, b;',
+                '    scanf("%d %d", &a, &b);',
+                '    printf("%d\\n", solution(a, b));',
+                '    return 0;',
+                '}'
+            ].join('\n'),
+            cpp: (src) => [
+                '#include <bits/stdc++.h>',
+                'using namespace std;',
+                '',
+                src,
+                '',
+                'int main() {',
+                '    int a, b; cin >> a >> b;',
+                '    cout << Solution().solution(a, b) << endl;',
+                '    return 0;',
+                '}'
+            ].join('\n'),
+            java: (src) => [
+                'import java.util.*;',
+                '',
+                src,
+                '',
+                'public class Main {',
+                '    public static void main(String[] args) {',
+                '        Scanner sc = new Scanner(System.in);',
+                '        int a = sc.nextInt();',
+                '        int b = sc.nextInt();',
+                '        System.out.println(new Solution().solution(a, b));',
+                '    }',
+                '}'
+            ].join('\n'),
+            js: (src) => [
+                src,
+                '',
+                "const input = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);",
+                'console.log(solution(input[0], input[1]));'
+            ].join('\n'),
+            python: (src) => [
+                src,
+                '',
+                'import sys',
+                'data = sys.stdin.read().split()',
+                'a, b = int(data[0]), int(data[1])',
+                'print(solution(a, b))'
+            ].join('\n')
+        },
         "array-to-int": {
             c: (src) => [
                 '#include <stdio.h>',
