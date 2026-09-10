@@ -1,13 +1,13 @@
 name: Keep-alive
 
-# Render's free tier spins the backend down after ~15 minutes without
-# inbound traffic, giving the next visitor a 30-50s cold start. This ping
-# keeps the service warm and re-warms the external contest-calendar caches.
+# The backend runs as a Vercel serverless function. This ping keeps a warm
+# instance around and re-primes the in-memory contest-calendar caches, which
+# a cold invocation would otherwise have to refetch from five upstream APIs.
 #
 # GitHub Actions cron cannot run more often than every 5 minutes (and the
-# scheduler routinely adds delay); every 10 minutes is comfortably inside
-# Render's idle window. For a strict 1-minute heartbeat use an external
-# pinger (e.g. cron-job.org) pointed at the same /health URL.
+# scheduler routinely adds delay), so 10 minutes is the practical cadence.
+# For a strict 1-minute heartbeat, point an external pinger (e.g.
+# cron-job.org) at the same /health URL.
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -22,19 +22,25 @@ jobs:
     steps:
       - name: Ping backend health
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-backend-eeso.onrender.com/health" || echo 000)
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-api.vercel.app/health" || echo 000)
           echo "health: HTTP $code"
           # A cold start can exceed the first request's timeout — retry once.
-          if [ "$code" != "200" ]; then
+          if [ "$code" != "200" ] && [ "$code" != "503" ]; then
             sleep 20
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-backend-eeso.onrender.com/health" || echo 000)
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-api.vercel.app/health" || echo 000)
             echo "health (retry): HTTP $code"
           fi
-          [ "$code" = "200" ]
+          # 503 is the documented degraded response: the service is up and
+          # serving, the database is not reachable. That is a real state to
+          # observe, not a keep-alive failure — only no response at all is.
+          if [ "$code" = "503" ]; then
+            echo "::warning::backend is up but reports degraded (database unreachable)"
+          fi
+          [ "$code" = "200" ] || [ "$code" = "503" ]
 
       - name: Re-warm contest calendar caches
         run: |
           for ep in codeforces-contests leetcode-contests codechef-contests atcoder-contests hackerrank-contests; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-backend-eeso.onrender.com/api/$ep" || echo 000)
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "https://algoforge-api.vercel.app/api/$ep" || echo 000)
             echo "$ep: HTTP $code"
           done

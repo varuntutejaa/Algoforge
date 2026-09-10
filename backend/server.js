@@ -39,11 +39,16 @@ app.use(express.json());
 // Mounted before DB connect so /health responds immediately (as "degraded" until Mongo connects).
 app.use(publicHealthRoutes);
 
-// Background supervisor: never rejects, and never takes the process down —
-// a database outage degrades the DB-backed routes only (see config/db.js).
-connectWithRetry().catch((err) => {
-    console.error('DB supervisor stopped unexpectedly:', err);
-});
+// Long-running hosts get a background supervisor that keeps watching the
+// database and never takes the process down (see config/db.js). On a
+// serverless host each invocation is short-lived and Prisma connects lazily,
+// so a perpetual retry loop there would just burn execution time.
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+if (!IS_SERVERLESS) {
+    connectWithRetry().catch((err) => {
+        console.error('DB supervisor stopped unexpectedly:', err);
+    });
+}
 
 // optionalAuth attaches req.user when a valid session is present, without rejecting anonymous requests.
 app.use('/api/contests', optionalAuth, contestRoutes);
@@ -56,7 +61,8 @@ app.use('/submit-code', optionalAuth, submissionsRoutes);
 
 const PORT = process.env.PORT || 8000;
 
-app.listen(PORT, () => {
+function startStandaloneServer() {
+    return app.listen(PORT, () => {
     console.log(`Server running on ${PORT}`);
 
     // Pre-warm external contest caches so first user doesn't wait
@@ -82,4 +88,14 @@ app.listen(PORT, () => {
             console.log('✅ HackerRank cache warmed');
         } catch {}
     }, 100);
-});
+    });
+}
+
+// Bind a port only when run as a real process. A serverless host imports this
+// module and owns the request lifecycle itself, so calling listen() there
+// would bind a port nothing routes to.
+if (require.main === module) {
+    startStandaloneServer();
+}
+
+module.exports = app;

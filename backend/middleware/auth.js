@@ -1,23 +1,44 @@
-const { createRemoteJWKSet, jwtVerify } = require("jose");
 const { prisma } = require("../config/prismaClient");
 
 // Supabase signs access tokens with a per-project ES256 key, published at a
 // public JWKS endpoint — no shared secret to configure. jose's
 // createRemoteJWKSet caches the key set and re-fetches on a kid it hasn't
 // seen, so key rotation on Supabase's side doesn't need a redeploy here.
-let jwks = null;
+//
+// jose v6 is ESM-only. Node 22.12+ can require() ESM, but serverless
+// bundlers (Vercel's included) still cannot — so it is imported dynamically
+// and memoized rather than required at module load.
+let josePromise = null;
+function loadJose() {
+  if (!josePromise) josePromise = import("jose");
+  return josePromise;
+}
+
+let jwksPromise = null;
 let issuer = null;
 let initError = null;
 
-try {
-  if (!process.env.SUPABASE_URL) {
-    throw new Error("SUPABASE_URL is not set");
-  }
+if (process.env.SUPABASE_URL) {
   issuer = `${process.env.SUPABASE_URL}/auth/v1`;
-  jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
-} catch (error) {
-  initError = error.message;
+} else {
+  initError = "SUPABASE_URL is not set";
   console.error("Supabase JWKS not initialized:", initError);
+}
+
+// Built once and reused, so the key set stays cached across requests (and,
+// on a warm serverless instance, across invocations).
+function getJwks() {
+  if (!jwksPromise) {
+    jwksPromise = loadJose().then(({ createRemoteJWKSet }) =>
+      createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`))
+    );
+  }
+  return jwksPromise;
+}
+
+async function verifyToken(token) {
+  const [{ jwtVerify }, jwks] = await Promise.all([loadJose(), getJwks()]);
+  return jwtVerify(token, jwks, { issuer, audience: "authenticated" });
 }
 
 function extractName(payload) {
@@ -43,7 +64,7 @@ async function findOrCreateUser(payload) {
 async function requireAuth(req, res, next) {
   if (req.user) return next();
 
-  if (!jwks) {
+  if (!issuer) {
     console.error("requireAuth: Supabase JWKS not initialized:", initError);
     return res.status(503).json({
       success: false,
@@ -62,7 +83,7 @@ async function requireAuth(req, res, next) {
     }
 
     const token = authHeader.split(" ")[1];
-    const { payload } = await jwtVerify(token, jwks, { issuer, audience: "authenticated" });
+    const { payload } = await verifyToken(token);
 
     req.user = await findOrCreateUser(payload);
     next();
@@ -80,7 +101,7 @@ async function requireAuth(req, res, next) {
  * Middleware: optionalAuth
  */
 async function optionalAuth(req, res, next) {
-  if (!jwks) {
+  if (!issuer) {
     req.user = null;
     return next();
   }
@@ -94,7 +115,7 @@ async function optionalAuth(req, res, next) {
     }
 
     const token = authHeader.split(" ")[1];
-    const { payload } = await jwtVerify(token, jwks, { issuer, audience: "authenticated" });
+    const { payload } = await verifyToken(token);
 
     req.user = await findOrCreateUser(payload);
     next();
