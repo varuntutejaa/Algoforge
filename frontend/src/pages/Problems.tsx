@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { fetchProblems, fetchSolvedIds } from '@/api/problems';
 import DiffBadge from '@/components/ui/DiffBadge';
+import { TableSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
 import type { Problem } from '@/types/problem';
 
 function getDailyProblem(problems: Problem[]): Problem | null {
@@ -22,15 +23,22 @@ export default function Problems() {
   const [tag, setTag] = useState('all');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [probs, solved] = await Promise.all([fetchProblems(), fetchSolvedIds(getHeaders())]);
-        setProblems(probs); setSolvedSet(new Set(solved));
-      } catch (e: any) { setError(e.message); }
-      finally { setLoading(false); }
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // The solved list needs auth and is non-essential — a signed-out user
+      // (or an expired token) should still get the problem list.
+      const [probs, solved] = await Promise.all([
+        fetchProblems(),
+        fetchSolvedIds(getHeaders()).catch(() => [] as string[])
+      ]);
+      setProblems(probs); setSolvedSet(new Set(solved));
+    } catch (e: any) { setError(e.message || 'Failed to load problems'); }
+    finally { setLoading(false); }
   }, [getHeaders]);
+
+  useEffect(() => { load(); }, [load]);
 
   const daily = useMemo(() => getDailyProblem(problems), [problems]);
   const allTags = useMemo(() => Array.from(new Set(problems.flatMap(p => p.tags))).sort(), [problems]);
@@ -130,10 +138,28 @@ export default function Problems() {
 
         {/* Table body */}
         <div className="prob-table-body">
-          {loading && <div style={{ color: '#64748b', fontSize: 14, padding: '32px 20px', textAlign: 'center' }}>Loading problems…</div>}
-          {error && <div style={{ color: '#f87171', fontSize: 14, padding: '32px 20px', textAlign: 'center' }}>{error}</div>}
-          {!loading && !error && filtered.length === 0 && (
-            <div style={{ color: '#64748b', fontSize: 14, padding: '32px 20px', textAlign: 'center' }}>No problems match your filters.</div>
+          {loading && <TableSkeleton rows={10} />}
+          {!loading && error && <ErrorState message={error} onRetry={load} />}
+          {!loading && !error && problems.length === 0 && (
+            <EmptyState
+              title="No problems yet"
+              hint="The problem set hasn't been seeded for this environment."
+            />
+          )}
+          {!loading && !error && problems.length > 0 && filtered.length === 0 && (
+            <EmptyState
+              title="No problems match your filters"
+              hint="Try a different topic, difficulty, or search term."
+              action={
+                <button
+                  type="button"
+                  className="af-retry-btn"
+                  onClick={() => { setSearch(''); setDifficulty('all'); setTag('all'); }}
+                >
+                  Clear filters
+                </button>
+              }
+            />
           )}
           {!loading && !error && filtered.map(p => {
             const isDaily = p.id === daily?.id;

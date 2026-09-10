@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
 import { useAuth } from '@/context/AuthContext';
 import { fetchMyContests, fetchAvailableContests, createContest, joinContest, fetchLeaderboard } from '@/api/contests';
 import { fetchProblems } from '@/api/problems';
@@ -213,6 +214,7 @@ export default function Contests() {
   const [myC, setMyC] = useState<Contest[]>([]);
   const [avail, setAvail] = useState<Contest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchQ, setSearchQ] = useState(''), [statusF, setStatusF] = useState('all');
   const [joinCode, setJoinCode] = useState(''), [joinMsg, setJoinMsg] = useState(''), [joining, setJoining] = useState(false);
   const [, setCopied] = useState('');
@@ -221,8 +223,10 @@ export default function Contests() {
   const load = useCallback(async () => {
     try {
       const [my, av] = await Promise.all([fetchMyContests(getHeaders()), fetchAvailableContests(getHeaders())]);
-      setMyC(my); setAvail(av);
-    } catch {} finally { setLoading(false); }
+      setMyC(my); setAvail(av); setLoadError('');
+    } catch (e: any) {
+      setLoadError(e?.message || 'Failed to load contests');
+    } finally { setLoading(false); }
   }, [getHeaders]);
 
   useEffect(() => { load(); interval.current = setInterval(load, 30000); return () => { if(interval.current) clearInterval(interval.current); }; }, [load]);
@@ -289,8 +293,16 @@ export default function Contests() {
       {/* My Contests */}
       {tab==='my' && (
         <div className="contest-panel active">
-          {loading && <p className="loading-text">Loading…</p>}
-          {!loading && fMy.length===0 && <p className="empty-state">No contests match your filters.</p>}
+          {loading && <CardSkeleton count={3} />}
+          {!loading && loadError && <ErrorState message={loadError} onRetry={() => { setLoading(true); load(); }} />}
+          {!loading && !loadError && fMy.length === 0 && (
+            <EmptyState
+              title={myC.length === 0 ? "You haven't joined a contest yet" : 'No contests match your filters'}
+              hint={myC.length === 0
+                ? 'Create one from the + Create tab, or join an existing contest with its code.'
+                : 'Try a different search term or status filter.'}
+            />
+          )}
           {fMy.map(c => <ContestCard key={c.code} c={c} onCopy={copy} />)}
         </div>
       )}
@@ -314,8 +326,14 @@ export default function Contests() {
           </div>
           {joinMsg && <p style={{ fontSize:14, color: joinMsg.startsWith('✓')?'#22c55e':'#f87171', marginBottom:16 }}>{joinMsg}</p>}
           <h3 style={{ fontSize:14, fontWeight:700, color:'#94a3b8', marginBottom:12 }}>Available Contests</h3>
-          {loading && <p className="loading-text">Loading…</p>}
-          {!loading && fAv.length===0 && <p className="empty-state">No contests found.</p>}
+          {loading && <CardSkeleton count={2} />}
+          {!loading && loadError && <ErrorState message={loadError} onRetry={() => { setLoading(true); load(); }} />}
+          {!loading && !loadError && fAv.length === 0 && (
+            <EmptyState
+              title="No open contests right now"
+              hint="Have a code? Enter it above to join directly."
+            />
+          )}
           {fAv.map(c => <ContestCard key={c.code} c={c} onCopy={copy} />)}
         </div>
       )}
