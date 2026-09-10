@@ -13,6 +13,14 @@
     // @prisma/config only ever merges our own prisma.config.ts, at
     // build/dev time, never a live request. Remove once Prisma ships a
     // release pinning deepmerge-ts >=8.0.0.
-    "GHSA-ggr8-5vv4-36mx"
+    "GHSA-ggr8-5vv4-36mx",
+
+    // mysql2 (prisma > mysql2, pinned to an exact 3.15.3 — no semver range
+    // to bump within). The Prisma CLI bundles a driver per supported
+    // database; this datasource is "postgresql" and the runtime talks to it
+    // through @prisma/adapter-pg + pg. Nothing in this codebase references
+    // mysql2, so it is never loaded. Remove once Prisma ships a release
+    // pinning a patched mysql2.
+    "GHSA-3f6p-5ww8-9rcr"
   ]
 }
