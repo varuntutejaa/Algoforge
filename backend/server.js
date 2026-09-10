@@ -39,7 +39,11 @@ app.use(express.json());
 // Mounted before DB connect so /health responds immediately (as "degraded" until Mongo connects).
 app.use(publicHealthRoutes);
 
-connectWithRetry();
+// Background supervisor: never rejects, and never takes the process down —
+// a database outage degrades the DB-backed routes only (see config/db.js).
+connectWithRetry().catch((err) => {
+    console.error('DB supervisor stopped unexpectedly:', err);
+});
 
 // optionalAuth attaches req.user when a valid session is present, without rejecting anonymous requests.
 app.use('/api/contests', optionalAuth, contestRoutes);
