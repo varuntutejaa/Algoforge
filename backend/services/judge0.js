@@ -4,6 +4,8 @@
 const JUDGE0_URL = process.env.JUDGE0_URL || "https://ce.judge0.com";
 const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY;
 
+const { extraRunners } = require("./runners");
+
 const languageIds = {
     c: 50,
     cpp: 54,
@@ -920,7 +922,7 @@ function buildGenericRunner(runnerType, language, sourceCode) {
         }
     };
 
-    const langRunner = runners[runnerType];
+    const langRunner = runners[runnerType] || extraRunners[runnerType];
     if (!langRunner || !langRunner[language]) return sourceCode;
     return langRunner[language](sourceCode);
 }
