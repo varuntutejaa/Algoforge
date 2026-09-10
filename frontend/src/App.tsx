@@ -38,18 +38,20 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          {/* Public */}
+          {/* Public — browsing is open; the actions that need an identity
+              (submitting a solution, joining or creating a contest) prompt
+              for sign-in at the point of use instead. */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/problems" element={<Problems />} />
+          <Route path="/editor/:problemId" element={<Editor />} />
 
           {/* Protected */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/problems" element={<Problems />} />
-            <Route path="/editor/:problemId" element={<Editor />} />
-            <Route path="/calendar" element={<Calendar />} />
             <Route path="/contests" element={<Contests />} />
             <Route path="/contest-editor/:code" element={<ContestEditor />} />
             <Route path="/contest-results/:code" element={<ContestResults />} />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/useToast';
 import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview, fetchSolvedIds } from '@/api/problems';
 import DiffBadge from '@/components/ui/DiffBadge';
 import { IconArrowLeft, IconCheck, IconX, IconLock, IconBulb, IconSparkle, IconAlertCircle, IconPlay, IconSend, IconRotateCcw, IconChevronDown } from '@/components/ui/Icons';
@@ -109,7 +110,8 @@ function AiPanel({ title, text, loading: aiLoading, isHint, onClose }: { title:s
 export default function Editor() {
   const { problemId = 'two-sum' } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
-  const { user, getHeaders } = useAuth();
+  const toast = useToast();
+  const { user, idToken, getHeaders } = useAuth();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [probLoading, setProbLoading] = useState(true);
@@ -254,6 +256,13 @@ export default function Editor() {
 
   async function execute(action: 'run'|'submit') {
     if (!monacoRef.current || !problem) return;
+    // Running code is open to everyone; submitting records a result against
+    // an account, so that is where sign-in is required.
+    if (action === 'submit' && !idToken) {
+      toast.error('Sign in to submit your solution.');
+      navigate('/login', { state: { from: `/editor/${problemId}` } });
+      return;
+    }
     const src = monacoRef.current.getValue();
     action==='run' ? setRunning(true) : setSubmitting(true); setResults(null);
     try {
