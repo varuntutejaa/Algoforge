@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/ui/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -20,10 +21,14 @@ const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor', '/auth/callback'];
 function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const isFullscreen = FULLSCREEN_ROUTES.some((r) => pathname.startsWith(r));
+  // Footer only on the marketing surface — app views (problems, editor,
+  // calendar, ...) manage their own full-height layouts.
+  const showFooter = pathname === '/';
   return (
     <>
       {!isFullscreen && <Navbar />}
       {children}
+      {showFooter && <Footer />}
     </>
   );
 }

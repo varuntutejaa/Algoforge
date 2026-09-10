@@ -27,3 +27,128 @@ body { overflow: auto; }
 
 /* ── Week/day view min-height (calendar) ─── */
 .week-col { min-height: calc(24 * 60px); position: relative; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Production polish layer — shared tokens + global refinements.
+   Sits after all page CSS so it standardizes behavior site-wide.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+    --af-bg: #050505;
+    --af-surface: #0d1117;
+    --af-surface-2: #131a24;
+    --af-border: rgba(255, 255, 255, 0.08);
+    --af-text: #f8fafc;
+    --af-text-2: #94a3b8;
+    --af-text-3: #64748b;
+    --af-accent: #4f8ef7;
+    --af-accent-strong: #2f6fe0;
+    --af-success: #22c55e;
+    --af-danger: #f87171;
+    --af-radius: 12px;
+    --af-radius-sm: 8px;
+    --af-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Typography rendering */
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+}
+
+/* Text selection */
+::selection {
+    background: rgba(79, 142, 247, 0.35);
+    color: #fff;
+}
+
+/* Slim, dark scrollbars everywhere */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* Consistent, accessible keyboard focus */
+:focus-visible {
+    outline: 2px solid var(--af-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* Smooth interactive elements without animating layout */
+a, button, .btn, input, select, textarea {
+    transition: color 0.15s ease, background-color 0.15s ease,
+        border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease,
+        transform 0.15s ease;
+}
+button:active:not(:disabled), .btn:active:not(:disabled) { transform: translateY(1px); }
+button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ── Site footer (marketing surface) ── */
+.app-footer {
+    border-top: 1px solid var(--af-border);
+    background: rgba(255, 255, 255, 0.015);
+    margin-top: 80px;
+}
+.app-footer-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 48px 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+.app-footer-brand { display: flex; align-items: flex-start; gap: 12px; }
+.app-footer-logo { width: 34px; height: 34px; }
+.app-footer-name { font-size: 17px; font-weight: 800; color: var(--af-text); }
+.app-footer-tagline { margin: 4px 0 0; font-size: 13px; color: var(--af-text-3); }
+.app-footer-links { display: flex; gap: 64px; flex-wrap: wrap; }
+.app-footer-col { display: flex; flex-direction: column; gap: 10px; }
+.app-footer-heading {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--af-text-3);
+    margin-bottom: 2px;
+}
+.app-footer-col a {
+    font-size: 14px;
+    color: var(--af-text-2);
+    text-decoration: none;
+}
+.app-footer-col a:hover { color: var(--af-text); }
+.app-footer-bottom {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 18px 24px 28px;
+    border-top: 1px solid var(--af-border);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--af-text-3);
+}

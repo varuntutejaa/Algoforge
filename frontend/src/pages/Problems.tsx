@@ -114,7 +114,7 @@ export default function Problems() {
             </div>
 
             <div className="results-meta">
-              {!loading && `${filtered.length} of ${problems.length} problems`}
+              {!loading && `${filtered.length} of ${problems.length} problems · ${solvedSet.size} solved`}
             </div>
           </div>
         </div>
