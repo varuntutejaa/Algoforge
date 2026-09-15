@@ -2,7 +2,7 @@ const express = require('express');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const { prisma } = require('../config/prismaClient');
-const { formatProblem } = require('../services/problems');
+const { formatProblem, formatProblemPublic } = require('../services/problems');
 const { requireAdminKey } = require('../middleware/adminAuth');
 
 const adminWriteLimiter = rateLimit({
@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
 
         res.json({
             success: true,
-            problem: formatProblem(problem)
+            problem: formatProblemPublic(problem)
         });
     } catch (error) {
         console.log(error);
