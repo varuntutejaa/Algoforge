@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/config/api';
-import { fetchContest, fetchLeaderboard } from '@/api/contests';
+import { fetchContest, fetchLeaderboard, submitContestSolution } from '@/api/contests';
 import { fetchProblem } from '@/api/problems';
 import type { Contest, LeaderboardEntry } from '@/types/contest';
 import type { ProblemDetail, Language } from '@/types/problem';
@@ -52,11 +52,22 @@ export default function ContestEditor() {
   const [probSearch, setProbSearch] = useState('');
   const [diffFilter, setDiffFilter] = useState('all');
 
+  // Briefly highlights your own row when the score changes, so a solve is
+  // visible even if your rank doesn't move.
+  const [scoreFlash, setScoreFlash] = useState(false);
+
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const lbTimerRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  const flashRef = useRef<ReturnType<typeof setTimeout>|null>(null);
 
   async function loadLeaderboard(code: string) {
     try { setLeaderboard(await fetchLeaderboard(code, getHeaders())); } catch {}
+  }
+
+  function bumpScore() {
+    if (flashRef.current) clearTimeout(flashRef.current);
+    setScoreFlash(true);
+    flashRef.current = setTimeout(() => setScoreFlash(false), 1400);
   }
 
   function startTimer(c: Contest) {
@@ -92,11 +103,17 @@ export default function ContestEditor() {
         const probs = c.problems || []; setProblems(probs);
         if (probs.length) await switchProblem(0, probs, c, language);
         startTimer(c); await loadLeaderboard(c.code);
-        lbTimerRef.current = setInterval(() => loadLeaderboard(c.code), 10000);
+        // Your own score updates instantly from the submit response; this poll
+        // is for everyone else's solves.
+        lbTimerRef.current = setInterval(() => loadLeaderboard(c.code), 5000);
       } catch (err: any) { setError(err.message || 'Failed to load contest'); }
       finally { setLoading(false); }
     })();
-    return () => { if(timerRef.current) clearInterval(timerRef.current); if(lbTimerRef.current) clearInterval(lbTimerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (lbTimerRef.current) clearInterval(lbTimerRef.current);
+      if (flashRef.current) clearTimeout(flashRef.current);
+    };
   }, [contestCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleLangChange(newLang: Language) {
@@ -113,29 +130,41 @@ export default function ContestEditor() {
     const isSubmit = action==='submit';
     isSubmit ? setSubmitting(true) : setRunning(true);
     setResults(null); setResultsOpen(true);
+
+    // A submit used to judge the code twice: once via /submit-code and again
+    // inside the contest route, then fetch the leaderboard separately. The
+    // contest route judges server-side anyway and now returns the board, so a
+    // submit is a single request and the score moves with the verdict.
+    if (isSubmit) {
+      try {
+        const data = await submitContestSolution(
+          contestCode,
+          { problemId: problemDetail.id, language, sourceCode },
+          getHeaders(),
+        );
+        const passed = data.verdict === 'Accepted';
+        setResults({
+          success: true, action, passed, verdict: data.verdict, results: data.results,
+          passedTests: data.results.filter((r: any) => r.passed).length,
+          totalTests: data.results.length,
+        });
+        if (passed) setSolvedIds(s => new Set([...s, problemDetail.id]));
+        if (data.leaderboard.length) { setLeaderboard(data.leaderboard); bumpScore(); }
+      } catch (e: any) {
+        setResults({ success:false, message: e.message || 'Could not reach backend.' });
+      } finally { setSubmitting(false); }
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/submit-code`, {
         method: 'POST',
         headers: { ...getHeaders() as Record<string,string>, 'Content-Type':'application/json' },
         body: JSON.stringify({ problemId: problemDetail.id, language, sourceCode, action }),
       });
-      const data = await res.json();
-      setResults({ ...data, action });
-      if (isSubmit) {
-        const verdict = data.verdict||(data.passed?'Accepted':'Wrong Answer');
-        if (data.passed) setSolvedIds(s => new Set([...s, problemDetail.id]));
-        try {
-          const cRes = await fetch(`${API_BASE_URL}/api/contests/${contestCode}/submit`, {
-            method: 'POST',
-            headers: { ...getHeaders() as Record<string,string>, 'Content-Type':'application/json' },
-            body: JSON.stringify({ problemId: problemDetail.id, language, sourceCode, verdict }),
-          });
-          await cRes.json();
-        } catch {}
-        await loadLeaderboard(contestCode);
-      }
+      setResults({ ...(await res.json()), action });
     } catch { setResults({ success:false, message:'Could not reach backend.' }); }
-    finally { isSubmit ? setSubmitting(false) : setRunning(false); }
+    finally { setRunning(false); }
   }
 
   const filteredProblems = problems.filter(p => {
@@ -157,21 +186,21 @@ export default function ContestEditor() {
       {/* Top bar */}
       <div className="arena-topbar">
         <div className="arena-info">
-          <button onClick={() => navigate('/contests')} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:18 }}>←</button>
+          <button className="arena-back" onClick={() => navigate('/contests')} aria-label="Back to contests">←</button>
           <span className="arena-title">{contest.title}</span>
         </div>
 
         {/* Timer */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, minWidth:110 }}>
-          <div className="time-progress-wrap" style={{ width:'100%' }}>
+        <div className="arena-timer-block">
+          <span className="arena-timer-label">Time left</span>
+          <span className={`arena-timer${timerUrgent?' urgent':''}`}>{fmtTimer(timeLeft)}</span>
+          <div className="time-progress-wrap">
             <div className={`time-progress-bar${timerUrgent?' urgent':timeProgress < 30?' warn':''}`} style={{ width:`${timeProgress}%` }} />
           </div>
-          <span className={`arena-timer${timerUrgent?' urgent':''}`}>{fmtTimer(timeLeft)}</span>
         </div>
 
         <div className="topbar-actions">
-          <select value={language} onChange={e => handleLangChange(e.target.value as Language)}
-            style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', color:'#e2e8f0', borderRadius:8, padding:'6px 10px', fontSize:13, fontFamily:'inherit' }}>
+          <select className="arena-lang-select" value={language} onChange={e => handleLangChange(e.target.value as Language)}>
             <option value="cpp">C++</option>
             <option value="python">Python</option>
             <option value="java">Java</option>
@@ -179,11 +208,11 @@ export default function ContestEditor() {
             <option value="c">C</option>
           </select>
           <button onClick={() => { if (monacoRef.current && problemDetail) setCode(problemDetail.boilerplate[language] ?? ''); }}
-            className="btn btn-secondary" style={{ padding:'6px 12px', fontSize:12 }}>Reset</button>
-          <button disabled={running||submitting} onClick={() => execute('run')} className="btn btn-secondary" style={{ padding:'6px 12px', fontSize:12 }}>
+            className="btn btn-secondary arena-btn">Reset</button>
+          <button disabled={running||submitting} onClick={() => execute('run')} className="btn btn-secondary arena-btn">
             {running?'Running…':'Run'}
           </button>
-          <button disabled={running||submitting} onClick={() => execute('submit')} className="btn btn-primary" style={{ padding:'6px 14px', fontSize:12 }}>
+          <button disabled={running||submitting} onClick={() => execute('submit')} className="btn btn-primary arena-btn">
             {submitting?'Submitting…':'Submit'}
           </button>
         </div>
@@ -198,29 +227,27 @@ export default function ContestEditor() {
             <div className="problem-search">
               <input className="sidebar-search-input" placeholder="Search…" value={probSearch} onChange={e => setProbSearch(e.target.value)} />
             </div>
-            <div style={{ display:'flex', gap:4, padding:'0 12px 8px' }}>
+            <div className="arena-diff-row">
               {['all','easy','medium','hard'].map(d => (
                 <button key={d} onClick={() => setDiffFilter(d)}
-                  className={`pf-diff-btn${d!=='all'?' '+d:''}${diffFilter===d?' active':''}`}
-                  style={{ flex:1, padding:'3px 4px', fontSize:10 }}>
+                  className={`pf-diff-btn arena-diff-btn${d!=='all'?' '+d:''}${diffFilter===d?' active':''}`}>
                   {d==='all'?'All':d[0].toUpperCase()}
                 </button>
               ))}
             </div>
-            <div style={{ flex:1, overflowY:'auto' }}>
+            <div className="arena-problem-list">
               {filteredProblems.map(p => {
                 const realIdx = problems.indexOf(p), isSolved = solvedIds.has(p.problemId);
                 return (
                   <button key={p.problemId} onClick={() => switchProblem(realIdx)}
-                    className={`problem-item${realIdx===currentIdx?' active':''}`}
-                    style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', textAlign:'left', background: realIdx===currentIdx?'rgba(255,255,255,0.06)':'transparent', border:'none', color:'inherit', cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ flexShrink:0, width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, border:'1px solid', borderColor: isSolved?'rgba(134,239,172,0.4)':'rgba(255,255,255,0.1)', background: isSolved?'rgba(134,239,172,0.12)':'rgba(255,255,255,0.03)', color: isSolved?'#86efac':'#64748b', marginTop:2 }}>
+                    className={`problem-item${realIdx===currentIdx?' active':''}${isSolved?' solved':''}`}>
+                    <span className={`problem-item-badge${isSolved?' solved':''}`}>
                       {isSolved?'✓':realIdx+1}
                     </span>
-                    <div style={{ minWidth:0 }}>
-                      <div style={{ fontSize:12, color:'#cbd5e1', lineHeight:1.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.title}</div>
-                      {p.difficulty && <div style={{ fontSize:10, fontWeight:700 }} className={diffCls(p.difficulty)}>{p.difficulty}</div>}
-                    </div>
+                    <span className="problem-item-body">
+                      <span className="problem-item-title">{p.title}</span>
+                      {p.difficulty && <span className={`problem-item-diff ${diffCls(p.difficulty)}`}>{p.difficulty}</span>}
+                    </span>
                   </button>
                 );
               })}
@@ -229,30 +256,30 @@ export default function ContestEditor() {
         </div>
 
         {/* Center: problem + editor */}
-        <div className="arena-center" style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <div className="arena-center">
           {/* Problem description */}
-          <div className="arena-problem" style={{ padding:20, maxHeight:220, overflowY:'auto', borderBottom:'1px solid rgba(255,255,255,0.07)', flexShrink:0 }}>
-            <h2 style={{ fontSize:16, fontWeight:700, marginBottom:10, color:'#f1f5f9' }}>
+          <div className="arena-problem">
+            <h2 className="arena-problem-title">
               {problemDetail ? `#${currentIdx+1}: ${problemDetail.title}` : 'Select a problem'}
             </h2>
             {problemDetail && (
               <>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
-                  <span style={{ fontSize:11, fontWeight:700 }} className={diffCls(problemDetail.difficulty)}>{problemDetail.difficulty}</span>
-                  {problemDetail.tags.map(t => <span key={t} style={{ fontSize:10, background:'rgba(255,255,255,0.05)', color:'#64748b', padding:'2px 6px', borderRadius:4 }}>{t}</span>)}
+                <div className="arena-problem-meta">
+                  <span className={`arena-problem-difficulty ${diffCls(problemDetail.difficulty)}`}>{problemDetail.difficulty}</span>
+                  {problemDetail.tags.map(t => <span key={t} className="arena-problem-tag">{t}</span>)}
                 </div>
-                <div style={{ fontSize:13, color:'#94a3b8', lineHeight:1.6 }}>
-                  {problemDetail.description.map((p,i) => <p key={i} style={{ marginBottom:8 }}>{p}</p>)}
+                <div className="arena-problem-body">
+                  {problemDetail.description.map((p,i) => <p key={i}>{p}</p>)}
                 </div>
                 {problemDetail.example && (
-                  <pre style={{ whiteSpace:'pre-wrap', padding:12, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', color:'#dbeafe', background:'#05070b', fontFamily:"'DM Mono', monospace", fontSize:12, marginTop:10 }}>{problemDetail.example}</pre>
+                  <pre className="arena-problem-example">{problemDetail.example}</pre>
                 )}
               </>
             )}
           </div>
 
           {/* Monaco editor */}
-          <div className="code-editor-wrap" style={{ flex:1 }}>
+          <div className="code-editor-wrap">
             <MonacoEditor
               height="100%"
               language={MONACO_LANG[language]}
@@ -270,25 +297,40 @@ export default function ContestEditor() {
 
         {/* Right: leaderboard */}
         <div className="arena-panel arena-right">
-          <div className="arena-leaderboard" style={{ width:200, borderLeft:'1px solid rgba(255,255,255,0.08)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div className="sidebar-header">Leaderboard</div>
-            <div style={{ flex:1, overflowY:'auto' }}>
+          <div className="arena-leaderboard">
+            <div className="sidebar-header lb-header">
+              Leaderboard
+              <span className="lb-live" title="Updates as people solve">live</span>
+            </div>
+            <div className="arena-lb-list">
               {leaderboard.length === 0
                 ? <p className="leaderboard-empty">No participants yet.</p>
                 : leaderboard.map(entry => {
-                    const isSelf = entry.name===user?.name||entry.name===user?.email;
+                    const isSelf = entry.userId ? entry.userId === user?.id
+                      : entry.name===user?.name || entry.name===user?.email;
                     const solvedSet = new Set(entry.solvedProblems||[]);
                     return (
-                      <div key={entry.rank} className="leaderboard-row" style={{ padding:'10px 12px', borderBottom:'1px solid rgba(255,255,255,0.04)', background: isSelf?'rgba(37,99,235,0.1)':'transparent' }}>
+                      <div
+                        key={entry.userId || entry.rank}
+                        className={`leaderboard-row${isSelf?' self':''}${isSelf&&scoreFlash?' flash':''}`}
+                      >
                         <div className="lb-top-row">
                           <span className={`leaderboard-rank${entry.rank===1?' top-1':entry.rank===2?' top-2':entry.rank===3?' top-3':''}`}>{entry.rank}</span>
-                          <span className="leaderboard-name">{entry.name}{isSelf&&<span style={{ marginLeft:4, fontSize:9, color:'#60a5fa' }}>You</span>}</span>
-                          <span className="lb-score" style={{ color: entry.score>0?'#4ade80':'#64748b' }}>{entry.score>0?`+${entry.score}`:entry.score}</span>
+                          <span className="leaderboard-name">
+                            {entry.name}{isSelf && <span className="lb-you">You</span>}
+                          </span>
+                          <span className={`lb-score${entry.score>0?' positive':entry.score<0?' negative':''}`}>
+                            {entry.score>0?`+${entry.score}`:entry.score}
+                          </span>
                         </div>
                         <div className="lb-bottom-row">
                           <div className="lb-dots">
                             {problems.map((p,i) => (
-                              <span key={i} className={`lb-dot${solvedSet.has(p.problemId)?' solved':''}`} title={`P${i+1}`}>●</span>
+                              <span
+                                key={p.problemId||i}
+                                className={`lb-dot${solvedSet.has(p.problemId)?' solved':''}`}
+                                title={`P${i+1}: ${solvedSet.has(p.problemId)?'solved':'unsolved'}`}
+                              >●</span>
                             ))}
                           </div>
                           {entry.timeTakenSeconds!=null && <span className="lb-time">{fmtDuration(entry.timeTakenSeconds)}</span>}
@@ -306,12 +348,12 @@ export default function ContestEditor() {
       {resultsOpen && (
         <div className="results-overlay open" onClick={e => { if(e.target===e.currentTarget) setResultsOpen(false); }}>
           <div className="results-modal">
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div className="results-modal-head">
               <h3>Test Results</h3>
-              <button onClick={() => setResultsOpen(false)} style={{ background:'none', border:'none', color:'#64748b', fontSize:18, cursor:'pointer', lineHeight:1 }}>×</button>
+              <button className="results-modal-close" onClick={() => setResultsOpen(false)} aria-label="Close">×</button>
             </div>
-            {!results && <p style={{ color:'#60a5fa', fontSize:14, textAlign:'center', padding:'16px 0' }}>Running…</p>}
-            {results && !results.success && <p style={{ color:'#f87171', fontSize:14 }}>{results.message||'Execution failed'}</p>}
+            {!results && <p className="results-pending">{submitting ? 'Judging…' : 'Running…'}</p>}
+            {results && !results.success && <p className="results-error">{results.message||'Execution failed'}</p>}
             {results?.success && (
               <>
                 <div className={`results-summary${results.passed?' pass':' fail'}`}>
@@ -319,6 +361,9 @@ export default function ContestEditor() {
                     ? `${results.verdict}: ${results.passedTests}/${results.totalTests} passed`
                     : `Run: ${results.passedTests}/${results.totalTests} passed`}
                 </div>
+                {results.action==='submit' && results.passed && (
+                  <p className="results-scored">+100 points — leaderboard updated.</p>
+                )}
                 {results.results?.map((r: any, i: number) => (
                   <div key={i} className={`test-result${r.passed?' pass':' fail'}`}>
                     <div className="test-title">

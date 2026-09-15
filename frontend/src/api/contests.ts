@@ -29,6 +29,26 @@ export async function fetchLeaderboard(code: string, headers: HeadersInit): Prom
   return data.success ? data.leaderboard : [];
 }
 
+/**
+ * Contest submit. The server judges the code and returns the rebuilt
+ * leaderboard in the same response, so the score can move without a follow-up
+ * request.
+ */
+export async function submitContestSolution(
+  code: string,
+  payload: { problemId: string; language: string; sourceCode: string },
+  headers: HeadersInit,
+): Promise<{ verdict: string; results: any[]; leaderboard: LeaderboardEntry[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/contests/${encodeURIComponent(code)}/submit`, {
+    method: 'POST',
+    headers: { ...headers as Record<string, string>, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to submit');
+  return { verdict: data.verdict, results: data.results || [], leaderboard: data.leaderboard || [] };
+}
+
 export async function createContest(
   payload: {
     title: string;

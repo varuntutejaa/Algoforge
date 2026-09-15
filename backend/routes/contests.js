@@ -105,20 +105,11 @@ router.get("/:code", requireAuth, contestReadLimiter, async (req, res) => {
   }
 });
 
-// GET /api/contests/:code/leaderboard
-router.get("/:code/leaderboard", requireAuth, contestReadLimiter, async (req, res) => {
-  try {
-    const code = String(req.params.code || "").toUpperCase();
-    const contest = await prisma.contest.findUnique({
-      where: { code },
-      include: { participants: { include: { solves: true } } }
-    });
-
-    if (!contest) {
-      return res.status(404).json({ success: false, message: "Contest not found" });
-    }
-
-    const leaderboard = contest.participants
+// Shared by GET /leaderboard and POST /submit. The submit route returns the
+// rebuilt board in its own response so a solve shows up immediately, instead of
+// the client having to fire a second request and wait another round-trip.
+function buildLeaderboard(contest) {
+  return contest.participants
       .map((p) => {
         const finishedAt = p.finishedAt || null;
         let timeTakenSeconds = null;
@@ -156,6 +147,25 @@ router.get("/:code/leaderboard", requireAuth, contestReadLimiter, async (req, re
         return 0;
       })
       .map((p, index) => ({ rank: index + 1, ...p }));
+}
+
+async function loadLeaderboard(code) {
+  const contest = await prisma.contest.findUnique({
+    where: { code },
+    include: { participants: { include: { solves: true } } }
+  });
+  return contest ? buildLeaderboard(contest) : null;
+}
+
+// GET /api/contests/:code/leaderboard
+router.get("/:code/leaderboard", requireAuth, contestReadLimiter, async (req, res) => {
+  try {
+    const code = String(req.params.code || "").toUpperCase();
+    const leaderboard = await loadLeaderboard(code);
+
+    if (!leaderboard) {
+      return res.status(404).json({ success: false, message: "Contest not found" });
+    }
 
     res.json({ success: true, leaderboard });
   } catch (error) {
@@ -446,7 +456,11 @@ router.post("/:code/submit", requireAuth, contestSubmitLimiter, async (req, res)
       }
     });
 
-    res.json({ success: true });
+    // Send the rebuilt board back with the verdict. The client would otherwise
+    // have to issue a second request and wait for it before the score moved,
+    // which is what made a solve take a beat to appear.
+    const leaderboard = await loadLeaderboard(code);
+    res.json({ success: true, verdict, results, leaderboard });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to record contest submission" });
