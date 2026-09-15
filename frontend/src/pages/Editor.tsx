@@ -328,6 +328,12 @@ export default function Editor() {
   if (probError) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'#f87171', fontSize:14 }}>{probError}</div>;
   if (!problem) return null;
 
+  // 30 of the 150 problems are design/open-ended and carry no test cases, so
+  // the judge would reject a run with a 422. Surface that up front instead of
+  // letting the user write a solution and only then be told.
+  const testCount = problem.testCaseCount ?? problem.testCases?.length ?? 0;
+  const judgeable = testCount > 0;
+
   return (
     <div className="editor-shell">
       {/* Left: question panel */}
@@ -464,10 +470,14 @@ export default function Editor() {
 
         {/* Run / Submit actions */}
         <div className="editor-actions">
-          <button className="run-btn" disabled={running || submitting} onClick={() => execute('run')}>
+          <button className="run-btn" disabled={running || submitting || !judgeable}
+            title={judgeable ? undefined : 'This problem has no automated test cases.'}
+            onClick={() => execute('run')}>
             <IconPlay width={13} height={13} /> {running ? 'Running…' : 'Run Code'}
           </button>
-          <button className="editor-submit-btn" disabled={running || submitting} onClick={() => execute('submit')}>
+          <button className="editor-submit-btn" disabled={running || submitting || !judgeable}
+            title={judgeable ? undefined : 'This problem has no automated test cases.'}
+            onClick={() => execute('submit')}>
             <IconSend width={14} height={14} /> {submitting ? 'Submitting…' : 'Submit'}
           </button>
         </div>
@@ -475,7 +485,11 @@ export default function Editor() {
         {/* Results */}
         <div className="results-panel">
           {!results && (
-            <p className="results-empty">Run your code to evaluate it against {problem.testCases?.length ?? 0} test cases.</p>
+            <p className="results-empty">
+              {judgeable
+                ? `Run your code to evaluate it against ${testCount} test ${testCount === 1 ? 'case' : 'cases'}.`
+                : 'This problem is here to read and think about — it has no automated test cases, so it can\u2019t be judged.'}
+            </p>
           )}
           {results && !results.success && (
             <p className="error-text"><IconAlertCircle width={14} height={14} /> {results.message || 'Execution failed'}</p>

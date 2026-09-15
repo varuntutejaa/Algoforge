@@ -38,12 +38,15 @@ const contestReadLimiter = rateLimit({
 router.get("/", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
-    const where = userId
-      ? { OR: [{ createdBy: userId }, { participants: { some: { userId } } }] }
-      : {};
+    // "My contests" means this user's. With no identity there is nothing to
+    // list -- an empty filter would have returned every contest in the
+    // database to an anonymous caller.
+    if (!userId) {
+      return res.json({ success: true, contests: [] });
+    }
 
     const contests = await prisma.contest.findMany({
-      where,
+      where: { OR: [{ createdBy: userId }, { participants: { some: { userId } } }] },
       orderBy: { startsAt: "desc" },
       include: { problems: true, participants: true }
     });

@@ -179,6 +179,14 @@ export default function Problems() {
                 <div className="col-title">
                   {isDaily && <div className="daily-dot" title="Daily challenge" />}
                   <span className="row-title">{p.title}</span>
+                  {/* Design/open-ended problems carry no test cases, so the
+                      judge can't grade them. Say so here rather than letting
+                      someone write a solution and find out on Run. */}
+                  {p.testCaseCount === 0 && (
+                    <span className="row-unjudged" title="No automated test cases — reading only">
+                      read-only
+                    </span>
+                  )}
                 </div>
                 <div className="col-tags">
                   {visibleTags.map(t => <span key={t} className="row-tag">{t}</span>)}

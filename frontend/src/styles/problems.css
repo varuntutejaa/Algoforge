@@ -440,3 +440,18 @@ button { font: inherit; cursor: pointer; }
   .diff-group { gap: 3px; }
   .diff-btn { padding: 4px 9px; font-size: 11px; }
 }
+
+/* Marks problems that have no automated test cases (design and open-ended
+   ones), so the list says up front what the judge can and can't grade. */
+.row-unjudged{
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  white-space: nowrap;
+}

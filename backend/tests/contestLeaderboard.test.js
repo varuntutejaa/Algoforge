@@ -45,3 +45,20 @@ test('the verdict is still computed server-side', () => {
         'a client-supplied verdict would let anyone award themselves points'
     );
 });
+
+test('the contest list never returns every contest to an anonymous caller', () => {
+    // GET /api/contests is "my contests". It builds a Prisma filter from the
+    // caller's id, and an empty filter matches every row -- so a missing
+    // identity must short-circuit, not fall through to findMany.
+    const route = src.slice(src.indexOf('router.get("/", contestReadLimiter'));
+    const body = route.slice(0, route.indexOf('router.', 10));
+
+    assert.ok(
+        /if \(!userId\)[\s\S]{0,120}contests: \[\]/.test(body),
+        'an anonymous caller must get an empty list, not an unfiltered query'
+    );
+    assert.ok(
+        !/where,\s*$/m.test(body.slice(0, body.indexOf('orderBy'))),
+        'the query must not be driven by a possibly-empty `where` object'
+    );
+});
