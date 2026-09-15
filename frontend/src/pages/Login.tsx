@@ -35,7 +35,10 @@ export default function Login() {
       // survives; the redirect flow would reload and discard it.
       const cred = await signInWithPopup(auth, googleProvider);
       const idToken = await cred.user.getIdToken();
-      const res = await backendAuth('login', idToken, { name: cred.user.displayName || '' });
+      const res = await backendAuth('login', idToken, {
+        name: cred.user.displayName || '',
+        photoURL: cred.user.photoURL || '',
+      });
       if (!res.success) { toast.error(res.message || 'Sign-in failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome!');

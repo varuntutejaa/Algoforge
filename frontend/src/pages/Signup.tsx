@@ -40,7 +40,10 @@ export default function Signup() {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       const idToken = await cred.user.getIdToken();
-      const res = await backendAuth('signup', idToken, { name: cred.user.displayName || '' });
+      const res = await backendAuth('signup', idToken, {
+        name: cred.user.displayName || '',
+        photoURL: cred.user.photoURL || '',
+      });
       if (!res.success) { toast.error(res.message || 'Sign-up failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome!');

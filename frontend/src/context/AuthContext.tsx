@@ -24,7 +24,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readStoredUser(): AlgoforgeUser | null {
   try {
-    return JSON.parse(localStorage.getItem('algoforge-user') || 'null');
+    const raw = JSON.parse(localStorage.getItem('algoforge-user') || 'null');
+    if (!raw) return null;
+    // Sessions stored before the avatar was wired through have no photoURL.
+    return { ...raw, photoURL: raw.photoURL ?? raw.profilePicture ?? '' };
   } catch {
     return null;
   }
@@ -54,7 +57,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         const token = await fbUser.getIdToken();
-        setState((prev) => ({ ...prev, idToken: token, loading: false }));
+        setState((prev) => {
+          // Heal a session that was stored before the avatar was carried
+          // through, so an already-signed-in user doesn't keep showing a
+          // letter until they log out and back in.
+          const photoURL = fbUser.photoURL || '';
+          const user = prev.user && photoURL && prev.user.photoURL !== photoURL
+            ? { ...prev.user, photoURL }
+            : prev.user;
+          if (user !== prev.user) {
+            try { localStorage.setItem('algoforge-user', JSON.stringify(user)); } catch { /* quota or private mode */ }
+          }
+          return { ...prev, user, idToken: token, loading: false };
+        });
       } catch {
         setState((prev) => ({ ...prev, idToken: null, loading: false }));
       }
@@ -97,6 +112,24 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+/**
+ * The API returns the avatar as `profilePicture`; the app reads `photoURL`.
+ * Mapping it here rather than at each call site is what keeps the Google
+ * picture from being silently dropped on the way in.
+ *
+ * `fallbackPhoto` is the photo straight from the Firebase credential, used on
+ * the very first Google sign-in when the backend row may predate the picture.
+ */
+function toAlgoforgeUser(raw: any, fallbackPhoto = ''): AlgoforgeUser {
+  return {
+    id: raw?.id ?? '',
+    uid: raw?.authId ?? raw?.uid ?? '',
+    name: raw?.name ?? '',
+    email: raw?.email ?? '',
+    photoURL: raw?.profilePicture || raw?.photoURL || fallbackPhoto || '',
+  };
+}
+
 /** Shared helper: POST to backend auth endpoint with a bearer token */
 export async function backendAuth(
   endpoint: 'login' | 'signup',
@@ -108,5 +141,9 @@ export async function backendAuth(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json();
+  if (data?.success && data.user) {
+    data.user = toAlgoforgeUser(data.user, typeof body.photoURL === 'string' ? body.photoURL : '');
+  }
+  return data;
 }

@@ -70,11 +70,16 @@ async function findOrCreateUser(payload) {
   const authId = payload.sub;
   const email = payload.email || "";
   const name = extractName(payload);
+  // Google's photo URL can change (new picture, rotated CDN path), and a user
+  // who signed up with email/password before linking Google has none stored at
+  // all. Refresh it on every verified token rather than only at creation.
+  // Guarded so a token without the claim never blanks an existing picture.
+  const picture = payload.picture || "";
 
   return prisma.user.upsert({
     where: { authId },
-    update: { email, ...(name ? { name } : {}) },
-    create: { authId, email, name, profilePicture: payload.picture || "" },
+    update: { email, ...(name ? { name } : {}), ...(picture ? { profilePicture: picture } : {}) },
+    create: { authId, email, name, profilePicture: picture },
   });
 }
 
