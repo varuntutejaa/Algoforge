@@ -15,7 +15,11 @@ const github = require('./github');
  * opted in at all (so the response stays clean), otherwise a result object.
  */
 async function syncAcceptedSolution({ user, problem, language, sourceCode, metrics }) {
-    if (!user?.githubSyncEnabled || !user.githubToken) return null;
+    if (!user?.githubToken) return null;
+    // Connected but auto-push paused: say so rather than staying silent, so the
+    // result panel can offer a one-off push instead of making the user go to
+    // settings, flip a switch and re-submit.
+    if (!user.githubSyncEnabled) return { status: 'disabled' };
     if (!github.isConfigured() || !cryptoReady()) {
         return { status: 'unavailable', message: 'GitHub sync is not configured on this server.' };
     }
@@ -69,6 +73,52 @@ async function syncAcceptedSolution({ user, problem, language, sourceCode, metri
     }
 }
 
+/**
+ * On-demand push for a user who has connected GitHub but left auto-push off.
+ *
+ * Deliberately pushes the stored *accepted* submission rather than code sent
+ * with the request: this endpoint writes to someone's repository, and taking
+ * arbitrary file contents from the client would turn it into a general-purpose
+ * GitHub writer. Pushing what the judge actually accepted also means the repo
+ * only ever contains verified-correct solutions.
+ */
+async function pushStoredSolution({ user, problemId }) {
+    if (!user?.githubToken) {
+        return { ok: false, status: 'not_connected', message: 'Connect GitHub first.' };
+    }
+    if (!github.isConfigured() || !cryptoReady()) {
+        return { ok: false, status: 'unavailable', message: 'GitHub sync is not configured on this server.' };
+    }
+
+    const submission = await prisma.submission.findFirst({
+        where: { userId: user.id, problemId, verdict: 'Accepted' },
+        orderBy: { submittedAt: 'desc' }
+    });
+    if (!submission) {
+        return { ok: false, status: 'not_solved', message: 'Solve this problem first — only accepted solutions can be pushed.' };
+    }
+
+    const problem = await prisma.problem.findUnique({ where: { id: problemId } });
+    if (!problem) {
+        return { ok: false, status: 'not_found', message: 'Problem not found.' };
+    }
+
+    // Reuse the same path/error handling as the automatic push by running it
+    // against a user object with sync temporarily treated as enabled.
+    const result = await syncAcceptedSolution({
+        user: { ...user, githubSyncEnabled: true },
+        problem,
+        language: submission.language,
+        sourceCode: submission.sourceCode,
+        metrics: { runtime: submission.runtime, memory: submission.memory }
+    });
+
+    if (!result || result.status === 'created' || result.status === 'updated') {
+        return { ok: true, ...(result || {}) };
+    }
+    return { ok: false, ...result };
+}
+
 async function clearConnection(userId) {
     try {
         await prisma.user.update({
@@ -80,4 +130,4 @@ async function clearConnection(userId) {
     }
 }
 
-module.exports = { syncAcceptedSolution };
+module.exports = { syncAcceptedSolution, pushStoredSolution };

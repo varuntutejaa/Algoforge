@@ -4,6 +4,7 @@ import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview, fetchSolvedIds } from '@/api/problems';
+import { pushSolutionToGithub } from '@/api/github';
 import DiffBadge from '@/components/ui/DiffBadge';
 import { IconArrowLeft, IconCheck, IconX, IconLock, IconBulb, IconSparkle, IconAlertCircle, IconPlay, IconSend, IconRotateCcw, IconChevronDown } from '@/components/ui/Icons';
 import type { ProblemDetail, Language } from '@/types/problem';
@@ -129,6 +130,10 @@ export default function Editor() {
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<any>(null);
+  // Set when the solve was accepted but auto-push is paused, so the panel can
+  // offer a one-off push instead of sending the user to Settings.
+  const [pushOffer, setPushOffer] = useState<'idle'|'pushing'|'done'>('idle');
+  const [pushedUrl, setPushedUrl] = useState<string | null>(null);
   const [isSolved, setIsSolved] = useState(false);
 
   const [aiOpen, setAiOpen] = useState(false);
@@ -265,6 +270,7 @@ export default function Editor() {
     }
     const src = monacoRef.current.getValue();
     action==='run' ? setRunning(true) : setSubmitting(true); setResults(null);
+    setPushOffer('idle'); setPushedUrl(null);
     try {
       const res = await submitCode({ problemId, language, sourceCode: src, userId: user?.id, action }, getHeaders());
       setResults({ ...res, action });
@@ -276,6 +282,9 @@ export default function Editor() {
         if (sync) {
           if (sync.status === 'created' || sync.status === 'updated') {
             toast.success(`Pushed to ${sync.repo}`);
+          } else if (sync.status === 'disabled') {
+            // Connected, auto-push paused: the results panel offers the push.
+            setPushOffer('idle');
           } else if (sync.status === 'reconnect' || sync.status === 'missing_repo') {
             toast.error(sync.message || 'GitHub sync needs attention — check Settings.');
           }
@@ -283,6 +292,21 @@ export default function Editor() {
       }
     } catch { setResults({ success:false, message:'Could not reach the backend server.' }); }
     finally { action==='run' ? setRunning(false) : setSubmitting(false); }
+  }
+
+  /** One-off push when auto-push is paused. The server pushes the stored
+   *  accepted submission, so nothing about the code is sent again here. */
+  async function handleManualPush() {
+    setPushOffer('pushing');
+    try {
+      const r = await pushSolutionToGithub(problemId, getHeaders());
+      setPushedUrl(r.url || r.commitUrl || null);
+      setPushOffer('done');
+      toast.success(`Pushed to ${r.repo}`);
+    } catch (e: any) {
+      setPushOffer('idle');
+      toast.error(e.message || 'Could not push to GitHub');
+    }
   }
 
   async function openHint(num: number) {
@@ -464,6 +488,31 @@ export default function Editor() {
                   ? (results.passed ? `Accepted: ${results.passedTests}/${results.totalTests} passed` : `${results.verdict}: ${results.passedTests}/${results.totalTests} passed`)
                   : (results.passed ? `All tests passed: ${results.passedTests}/${results.totalTests} (not submitted)` : `${results.passedTests}/${results.totalTests} passed`)}
               </p>
+              {results.action === 'submit' && results.passed
+                && results.githubSync?.status === 'disabled' && (
+                <div className="results-push">
+                  {pushOffer === 'done' ? (
+                    <p className="results-push-done">
+                      <IconCheck width={13} height={13} /> Pushed to GitHub
+                      {pushedUrl && (
+                        <> — <a href={pushedUrl} target="_blank" rel="noreferrer noopener">view file</a></>
+                      )}
+                    </p>
+                  ) : (
+                    <>
+                      <span className="results-push-label">Auto-push is paused.</span>
+                      <button
+                        type="button"
+                        className="results-push-btn"
+                        onClick={handleManualPush}
+                        disabled={pushOffer === 'pushing'}
+                      >
+                        {pushOffer === 'pushing' ? 'Pushing…' : 'Push to GitHub'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="results-list">
                 {results.results?.map((r: any, i: number) => (
                   <div key={i} className={`test-result${r.passed?' pass':' fail'}`}>

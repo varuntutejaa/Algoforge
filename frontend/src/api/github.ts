@@ -11,7 +11,8 @@ export interface GithubStatus {
 
 /** Result of an auto-push, returned alongside an accepted verdict. */
 export interface GithubSyncResult {
-  status: 'created' | 'updated' | 'failed' | 'reconnect' | 'missing_repo' | 'unavailable';
+  /** `disabled` means connected but auto-push is off — a manual push is offered. */
+  status: 'created' | 'updated' | 'failed' | 'reconnect' | 'missing_repo' | 'unavailable' | 'disabled';
   path?: string;
   url?: string | null;
   commitUrl?: string | null;
@@ -43,6 +44,18 @@ export async function updateGithubSettings(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...(headers as Record<string, string>) },
     body: JSON.stringify(body),
+  }));
+}
+
+/** One-off push of the stored accepted solution for a problem. */
+export async function pushSolutionToGithub(
+  problemId: string,
+  headers: HeadersInit,
+): Promise<{ status: string; repo?: string; url?: string | null; commitUrl?: string | null }> {
+  return json(await fetch(`${API_BASE_URL}/api/github/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(headers as Record<string, string>) },
+    body: JSON.stringify({ problemId }),
   }));
 }
 

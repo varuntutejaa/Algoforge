@@ -14,6 +14,7 @@ const { prisma } = require('../config/prismaClient');
 const { requireAuth } = require('../middleware/auth');
 const { encrypt, isConfigured: cryptoReady } = require('../services/crypto');
 const github = require('../services/github');
+const { pushStoredSolution } = require('../services/githubSync');
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -169,6 +170,37 @@ router.patch('/settings', requireAuth, githubLimiter, async (req, res) => {
         success: true,
         syncEnabled: updated.githubSyncEnabled,
         repo: updated.githubRepo
+    });
+});
+
+/**
+ * One-off push, for users who keep auto-push off but want a particular
+ * solution in their repo. Takes only a problem id — the code pushed is the
+ * accepted submission already stored for this user.
+ */
+router.post('/push', requireAuth, githubLimiter, async (req, res) => {
+    const { problemId } = req.body;
+    if (!problemId || typeof problemId !== 'string') {
+        return res.status(400).json({ success: false, message: 'problemId is required' });
+    }
+
+    const result = await pushStoredSolution({ user: req.user, problemId });
+    if (!result.ok) {
+        const code = result.status === 'not_solved' ? 400
+            : result.status === 'not_connected' ? 400
+            : result.status === 'not_found' ? 404
+            : result.status === 'unavailable' ? 503
+            : 502;
+        return res.status(code).json({ success: false, status: result.status, message: result.message });
+    }
+
+    res.json({
+        success: true,
+        status: result.status,
+        path: result.path,
+        url: result.url,
+        commitUrl: result.commitUrl,
+        repo: result.repo
     });
 });
 

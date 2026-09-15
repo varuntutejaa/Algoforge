@@ -64,7 +64,7 @@ test('the GitHub OAuth callback is not behind requireAuth', () => {
 
 test('the other GitHub routes do require auth', () => {
     const src = source('github.js');
-    for (const route of ["router.get('/status'", "router.get('/connect'", "router.patch('/settings'", "router.post('/disconnect'"]) {
+    for (const route of ["router.get('/status'", "router.get('/connect'", "router.patch('/settings'", "router.post('/push'", "router.post('/disconnect'"]) {
         const line = src.split('\n').find((l) => l.includes(route));
         assert.ok(line, `${route} should exist`);
         assert.ok(line.includes('requireAuth'), `${route} must be authenticated`);
