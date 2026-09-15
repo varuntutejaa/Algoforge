@@ -9,6 +9,11 @@ const { languageIds, runTestSuite } = require("../services/judge0");
 
 const router = express.Router();
 
+// Upper bounds for contest creation. The UI already caps the pickers at these
+// values; declaring them here keeps the API honest for direct callers.
+const MAX_CONTEST_PROBLEMS = 20;
+const MAX_DURATION_MINUTES = 480; // 8 hours
+
 function generateContestCode() {
   return crypto.randomBytes(3).toString("hex").toUpperCase().slice(0, 6);
 }
@@ -171,6 +176,40 @@ router.post("/create", requireAuth, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Title, start time, and duration (>=1 minute) are required"
+      });
+    }
+
+    // The client enforces these too, but it is the only thing enforcing them —
+    // and the API is public, so a direct call could otherwise create a contest
+    // that is dead on arrival (already ended, so nobody can ever join or
+    // submit) or one containing the entire problem set.
+    const parsedStart = new Date(startsAt);
+    if (Number.isNaN(parsedStart.getTime())) {
+      return res.status(400).json({ success: false, message: "Start time is not a valid date" });
+    }
+    // A small grace window absorbs clock skew between client and server for
+    // the common "start it right now" case.
+    if (parsedStart.getTime() < Date.now() - 60 * 1000) {
+      return res.status(400).json({ success: false, message: "Start time must be in the future" });
+    }
+    if (durationMinutes > MAX_DURATION_MINUTES) {
+      return res.status(400).json({
+        success: false,
+        message: `Duration must be at most ${MAX_DURATION_MINUTES} minutes`
+      });
+    }
+    if (isRandom) {
+      const requested = problems?.count;
+      if (requested !== undefined && (!Number.isInteger(requested) || requested < 1 || requested > MAX_CONTEST_PROBLEMS)) {
+        return res.status(400).json({
+          success: false,
+          message: `Problem count must be between 1 and ${MAX_CONTEST_PROBLEMS}`
+        });
+      }
+    } else if (Array.isArray(problems) && problems.length > MAX_CONTEST_PROBLEMS) {
+      return res.status(400).json({
+        success: false,
+        message: `A contest can include at most ${MAX_CONTEST_PROBLEMS} problems`
       });
     }
 
