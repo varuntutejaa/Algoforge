@@ -1,69 +1,39 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/config/supabase';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth, authErrorMessage } from '@/config/firebase';
 import { useToast } from '@/hooks/useToast';
-import { API_BASE_URL } from '@/config/api';
 
+/**
+ * Firebase hosts the reset page itself: it emails a link, the user sets a new
+ * password on Google's page, then returns to sign in. So unlike the previous
+ * provider there is no in-app "enter the code, then choose a password" step to
+ * implement — this screen only needs to request the email.
+ */
 export default function ForgotPassword() {
-  const navigate = useNavigate();
   const toast = useToast();
-  const [stage, setStage] = useState<'email' | 'sent' | 'reset'>('email');
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Supabase fires this once the recovery link's token lands in the URL and
-  // establishes a temporary session scoped to the password-update call below.
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setStage('reset');
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) { toast.error('Email is required'); return; }
     setLoading(true);
     try {
-      const checkRes = await fetch(`${API_BASE_URL}/api/auth/check-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      const checkData = await checkRes.json();
-      if (!checkData.exists) {
-        toast.error('No account found with this email');
-        return;
-      }
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/forgot-password`,
-      });
-      if (error) { toast.error(error.message || 'Failed to send reset link'); return; }
-
-      setStage('sent');
+      await sendPasswordResetEmail(auth, email.trim());
+      setSent(true);
       toast.success('Check your email for a reset link.');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to send reset link');
-    } finally { setLoading(false); }
-  }
-
-  async function handleReset(e: React.FormEvent) {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
-    if (newPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) { toast.error(error.message || 'Failed to reset password'); return; }
-
-      await supabase.auth.signOut();
-      toast.success('Password reset — sign in with your new password.');
-      setTimeout(() => navigate('/login'), 900);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to reset password');
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      // Firebase returns auth/user-not-found here, which would confirm whether
+      // an address is registered. Show the same result either way.
+      if (code === 'auth/user-not-found') {
+        setSent(true);
+        toast.success('Check your email for a reset link.');
+      } else {
+        toast.error(authErrorMessage(err));
+      }
     } finally { setLoading(false); }
   }
 
@@ -78,13 +48,13 @@ export default function ForgotPassword() {
             </Link>
             <h2 className="form-title">Reset password</h2>
             <p className="form-sub">
-              {stage === 'email' && "We'll send a reset link to your email."}
-              {stage === 'sent' && <>Check <strong>{email}</strong> for the reset link.</>}
-              {stage === 'reset' && 'Choose a new password.'}
+              {sent
+                ? <>If an account exists for <strong>{email}</strong>, a reset link is on its way.</>
+                : "We'll send a reset link to your email."}
             </p>
           </div>
 
-          {stage === 'email' && (
+          {!sent && (
             <form onSubmit={handleSubmit} noValidate>
               <div className="field-group">
                 <label className="field-label">Email</label>
@@ -99,26 +69,15 @@ export default function ForgotPassword() {
             </form>
           )}
 
-          {stage === 'reset' && (
-            <form onSubmit={handleReset} noValidate>
-              <div className="field-group">
-                <label className="field-label">New Password</label>
-                <div className="field-wrap">
-                  <input type="password" className="field-input" placeholder="Minimum 8 characters"
-                    value={newPassword} onChange={e => setNewPassword(e.target.value)} autoComplete="new-password" />
-                </div>
-              </div>
-              <div className="field-group">
-                <label className="field-label">Confirm New Password</label>
-                <div className="field-wrap">
-                  <input type="password" className="field-input" placeholder="Repeat password"
-                    value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-                </div>
-              </div>
-              <button type="submit" className="submit-btn" disabled={loading} style={{ marginTop: 8 }}>
-                {loading ? 'Resetting…' : 'Reset Password'}
-              </button>
-            </form>
+          {sent && (
+            <button
+              type="button"
+              className="submit-btn"
+              style={{ marginTop: 8 }}
+              onClick={() => { setSent(false); }}
+            >
+              Use a different email
+            </button>
           )}
 
           <p className="signup-prompt">

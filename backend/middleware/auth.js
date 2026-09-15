@@ -1,36 +1,46 @@
 const { prisma } = require("../config/prismaClient");
 
-// Supabase signs access tokens with a per-project ES256 key, published at a
-// public JWKS endpoint — no shared secret to configure. jose's
-// createRemoteJWKSet caches the key set and re-fetches on a kid it hasn't
-// seen, so key rotation on Supabase's side doesn't need a redeploy here.
+// Firebase ID tokens are ordinary RS256 JWTs signed by Google, so they can be
+// verified against Google's published public keys. That avoids pulling in
+// firebase-admin (a large dependency that also wants a service-account secret)
+// for what is ultimately one signature check.
 //
-// jose v6 is ESM-only. Node 22.12+ can require() ESM, but serverless
-// bundlers (Vercel's included) still cannot — so it is imported dynamically
-// and memoized rather than required at module load.
+// Contract for a Firebase ID token:
+//   issuer   https://securetoken.google.com/<projectId>
+//   audience <projectId>
+//   sub      the Firebase uid  -> stored as User.authId
+//
+// jose v6 is ESM-only. Node 22.12+ can require() ESM, but serverless bundlers
+// still cannot, so it is imported dynamically and memoized.
 let josePromise = null;
 function loadJose() {
   if (!josePromise) josePromise = import("jose");
   return josePromise;
 }
 
+const GOOGLE_JWKS_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
+
 let jwksPromise = null;
+let projectId = null;
 let issuer = null;
 let initError = null;
 
-if (process.env.SUPABASE_URL) {
-  issuer = `${process.env.SUPABASE_URL}/auth/v1`;
+if (process.env.FIREBASE_PROJECT_ID) {
+  projectId = process.env.FIREBASE_PROJECT_ID;
+  issuer = `https://securetoken.google.com/${projectId}`;
 } else {
-  initError = "SUPABASE_URL is not set";
-  console.error("Supabase JWKS not initialized:", initError);
+  initError = "FIREBASE_PROJECT_ID is not set";
+  console.error("Firebase token verification not initialized:", initError);
 }
 
-// Built once and reused, so the key set stays cached across requests (and,
-// on a warm serverless instance, across invocations).
+// Built once and reused so the key set stays cached across requests — and,
+// on a warm serverless instance, across invocations. Google rotates these
+// keys, and createRemoteJWKSet re-fetches when it sees an unknown kid.
 function getJwks() {
   if (!jwksPromise) {
     jwksPromise = loadJose().then(({ createRemoteJWKSet }) =>
-      createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`))
+      createRemoteJWKSet(new URL(GOOGLE_JWKS_URL))
     );
   }
   return jwksPromise;
@@ -38,12 +48,22 @@ function getJwks() {
 
 async function verifyToken(token) {
   const [{ jwtVerify }, jwks] = await Promise.all([loadJose(), getJwks()]);
-  return jwtVerify(token, jwks, { issuer, audience: "authenticated" });
+  const { payload } = await jwtVerify(token, jwks, { issuer, audience: projectId });
+
+  // Google signs tokens for every Firebase project with the same keys, so the
+  // issuer/audience check above is what binds a token to *this* project.
+  // `sub` must also be present and non-empty, since it becomes the user key.
+  if (!payload.sub) throw new Error("token has no subject claim");
+  return { payload };
 }
 
+/**
+ * Firebase puts the display name and picture in top-level claims (populated
+ * from the provider on Google sign-in, or from updateProfile for email/password
+ * signups). Fall back to the email local-part so a user always has a name.
+ */
 function extractName(payload) {
-  const meta = payload.user_metadata || {};
-  return meta.name || meta.full_name || (payload.email || "").split("@")[0] || "User";
+  return payload.name || payload.displayName || (payload.email || "").split("@")[0] || "User";
 }
 
 async function findOrCreateUser(payload) {
@@ -54,7 +74,7 @@ async function findOrCreateUser(payload) {
   return prisma.user.upsert({
     where: { authId },
     update: { email, ...(name ? { name } : {}) },
-    create: { authId, email, name, profilePicture: payload.user_metadata?.avatar_url || "" },
+    create: { authId, email, name, profilePicture: payload.picture || "" },
   });
 }
 
@@ -65,7 +85,7 @@ async function requireAuth(req, res, next) {
   if (req.user) return next();
 
   if (!issuer) {
-    console.error("requireAuth: Supabase JWKS not initialized:", initError);
+    console.error("requireAuth: Firebase verification not initialized:", initError);
     return res.status(503).json({
       success: false,
       message: "Authentication service is unavailable. Server misconfiguration.",
@@ -78,7 +98,7 @@ async function requireAuth(req, res, next) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Missing or invalid Authorization header. Use: Bearer <access-token>",
+        message: "Missing or invalid Authorization header. Use: Bearer <id-token>",
       });
     }
 
@@ -88,7 +108,7 @@ async function requireAuth(req, res, next) {
     req.user = await findOrCreateUser(payload);
     next();
   } catch (error) {
-    console.error("Supabase token verification failed:", error.message);
+    console.error("Firebase token verification failed:", error.message);
 
     return res.status(401).json({
       success: false,

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/config/supabase';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { onIdTokenChanged, signOut as fbSignOut, type User as FirebaseUser } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 import { API_BASE_URL } from '@/config/api';
 import type { AlgoforgeUser } from '@/types/user';
 
@@ -36,23 +37,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setState((prev) => ({ ...prev, idToken: session?.access_token ?? null, loading: false }));
-    });
+  // Held so getHeaders can always mint a fresh token, even if a render hasn't
+  // committed the latest one into state yet.
+  const fbUserRef = useRef<FirebaseUser | null>(null);
 
-    // Supabase's client refreshes the access token on its own schedule and
-    // fires this on every change (sign-in, sign-out, token refresh) — no
-    // manual polling/focus-listener needed like the old Cognito setup.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState((prev) => ({ ...prev, idToken: session?.access_token ?? null, loading: false }));
-      if (!session) {
+  useEffect(() => {
+    // onIdTokenChanged (rather than onAuthStateChanged) also fires on silent
+    // hourly token refreshes, so a long-lived tab never ends up sending an
+    // expired token to the backend.
+    const unsubscribe = onIdTokenChanged(auth, async (fbUser) => {
+      fbUserRef.current = fbUser;
+      if (!fbUser) {
         localStorage.removeItem('algoforge-user');
-        setState((prev) => ({ ...prev, user: null }));
+        setState({ user: null, idToken: null, loading: false });
+        return;
+      }
+      try {
+        const token = await fbUser.getIdToken();
+        setState((prev) => ({ ...prev, idToken: token, loading: false }));
+      } catch {
+        setState((prev) => ({ ...prev, idToken: null, loading: false }));
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const getHeaders = useCallback(
@@ -70,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    await fbSignOut(auth);
     localStorage.removeItem('algoforge-user');
     setState({ user: null, idToken: null, loading: false });
   }, []);

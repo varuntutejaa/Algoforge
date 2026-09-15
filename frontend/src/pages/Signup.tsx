@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase, OAUTH_REDIRECT_URI } from '@/config/supabase';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 
@@ -27,7 +28,6 @@ export default function Signup() {
   const navigate = useNavigate();
   const toast = useToast();
   const { login } = useAuth();
-  const [stage, setStage] = useState<'form' | 'sent'>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,11 +37,17 @@ export default function Signup() {
 
   async function handleGoogleSignIn() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: OAUTH_REDIRECT_URI },
-    });
-    if (error) { toast.error(error.message); setLoading(false); }
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const idToken = await cred.user.getIdToken();
+      const res = await backendAuth('signup', idToken, { name: cred.user.displayName || '' });
+      if (!res.success) { toast.error(res.message || 'Sign-up failed'); return; }
+      login(res.user, idToken);
+      toast.success('Welcome!');
+      setTimeout(() => navigate('/problems'), 600);
+    } catch (err) {
+      toast.error(authErrorMessage(err));
+    } finally { setLoading(false); }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,42 +58,22 @@ export default function Signup() {
     if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { name: name.trim() }, emailRedirectTo: OAUTH_REDIRECT_URI },
-      });
-      if (error) {
-        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
-          toast.error('An account with this email already exists.');
-        } else {
-          toast.error(error.message || 'Signup failed');
-        }
-        return;
-      }
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      // Firebase has no "name" field at creation; set it so the display name
+      // reaches the ID token (and therefore the backend) on refresh.
+      await updateProfile(cred.user, { displayName: name.trim() });
+      // Force-refresh so the freshly set displayName is present in the claims
+      // the backend reads, rather than arriving one token-refresh later.
+      const idToken = await cred.user.getIdToken(true);
 
-      // Email confirmation disabled on the Supabase project → session comes back immediately.
-      if (data.session) {
-        const idToken = data.session.access_token;
-        const res = await backendAuth('signup', idToken, { name: name.trim() });
-        if (!res.success) { toast.error(res.message || 'Signup failed'); return; }
-        login(res.user, idToken);
-        toast.success('Account created!');
-        setTimeout(() => navigate('/problems'), 900);
-        return;
-      }
-
-      setStage('sent');
-      toast.success('Check your email to confirm your account.');
-    } catch (err: any) {
-      toast.error(err.message || 'Signup failed');
+      const res = await backendAuth('signup', idToken, { name: name.trim() });
+      if (!res.success) { toast.error(res.message || 'Signup failed'); return; }
+      login(res.user, idToken);
+      toast.success('Account created!');
+      setTimeout(() => navigate('/problems'), 900);
+    } catch (err) {
+      toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
-  }
-
-  async function handleResend() {
-    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
-    if (error) { toast.error(error.message || 'Failed to resend'); return; }
-    toast.success('Confirmation email resent.');
   }
 
   return (
@@ -99,15 +85,11 @@ export default function Signup() {
               <img src="/assets/algoforge_favicon_themed.svg" alt="AlgoForge" style={{ width: 32, height: 32 }} />
               <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
             </Link>
-            <h2 className="form-title">{stage === 'form' ? 'Create account' : 'Check your email'}</h2>
-            <p className="form-sub">
-              {stage === 'form' ? 'Join AlgoForge and start competing.' : <>We sent a confirmation link to <strong>{email}</strong>.</>}
-            </p>
+            <h2 className="form-title">Create account</h2>
+            <p className="form-sub">Join AlgoForge and start competing.</p>
           </div>
 
-          {stage === 'form' && (
-            <>
-              <button type="button" className="oauth-btn" onClick={handleGoogleSignIn} disabled={loading}>
+          <button type="button" className="oauth-btn" onClick={handleGoogleSignIn} disabled={loading}>
                 <svg width="18" height="18" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -117,12 +99,9 @@ export default function Signup() {
                 Continue with Google
               </button>
 
-              <div className="divider"><span>or continue with</span></div>
-            </>
-          )}
+          <div className="divider"><span>or continue with</span></div>
 
-          {stage === 'form' ? (
-            <form className="signup-form" onSubmit={handleSubmit} noValidate>
+          <form className="signup-form" onSubmit={handleSubmit} noValidate>
               <div className="field-group">
                 <label className="field-label">Full Name</label>
                 <div className="field-wrap">
@@ -168,17 +147,7 @@ export default function Signup() {
               <button type="submit" className="submit-btn" disabled={loading}>
                 {loading ? 'Creating…' : 'Create Account'}
               </button>
-            </form>
-          ) : (
-            <div className="signup-form">
-              <p className="signup-prompt">
-                Didn't get it?{' '}
-                <button type="button" className="signup-link" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={handleResend}>
-                  Resend
-                </button>
-              </p>
-            </div>
-          )}
+          </form>
 
           <p className="signup-prompt">
             Already have an account? <Link to="/login" className="signup-link">Sign in</Link>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase, OAUTH_REDIRECT_URI } from '@/config/supabase';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { IconEye, IconEyeOff } from '@/components/ui/Icons';
@@ -29,11 +30,19 @@ export default function Login() {
 
   async function handleGoogleSignIn() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: OAUTH_REDIRECT_URI },
-    });
-    if (error) { toast.error(error.message); setLoading(false); }
+    try {
+      // A popup keeps the user on the page, so half-finished editor state
+      // survives; the redirect flow would reload and discard it.
+      const cred = await signInWithPopup(auth, googleProvider);
+      const idToken = await cred.user.getIdToken();
+      const res = await backendAuth('login', idToken, { name: cred.user.displayName || '' });
+      if (!res.success) { toast.error(res.message || 'Sign-in failed'); return; }
+      login(res.user, idToken);
+      toast.success('Welcome!');
+      setTimeout(() => navigate('/problems'), 600);
+    } catch (err) {
+      toast.error(authErrorMessage(err));
+    } finally { setLoading(false); }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -41,29 +50,15 @@ export default function Login() {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) {
-        if (error.message.includes('Email not confirmed')) {
-          toast.error('Please confirm your email first — check your inbox for the link.');
-        } else if (error.message.includes('Invalid login credentials')) {
-          toast.error('Incorrect email or password.');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      const idToken = data.session.access_token;
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const idToken = await cred.user.getIdToken();
       const res = await backendAuth('login', idToken);
       if (!res.success) { toast.error(res.message || 'Login failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome back!');
       setTimeout(() => navigate('/problems'), 800);
-    } catch (err: any) {
-      toast.error(err.message || 'Login failed');
+    } catch (err) {
+      toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
   }
 
