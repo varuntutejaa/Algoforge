@@ -41,12 +41,3 @@ export async function fetchSubmissions(
   if (!data.success) throw new Error(data.message || 'Failed to load submissions');
   return data.submissions;
 }
-
-//
-export async function fetchStreak(headers: HeadersInit): Promise<{ currentStreak: number; solvedToday: boolean }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/profile/streak`, { headers });
-    if (!res.ok) return { currentStreak: 0, solvedToday: false };
-    return res.json();
-  } catch { return { currentStreak: 0, solvedToday: false }; }
-}

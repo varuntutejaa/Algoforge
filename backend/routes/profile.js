@@ -39,7 +39,7 @@ router.get('/streak', requireAuth, async (req, res) => {
         }
         const currentStreak = isActive ? (user.currentStreak || 0) : 0;
         res.json({ currentStreak, longestStreak: user.longestStreak || 0, solvedToday });
-    } catch (error) {
+    } catch {
         res.status(500).json({ currentStreak: 0, longestStreak: 0, solvedToday: false });
     }
 });

@@ -6,7 +6,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const path = require('path');
 
 process.env.TOKEN_ENCRYPTION_KEY = crypto.randomBytes(32).toString('base64');
 process.env.GITHUB_CLIENT_ID = 'test-client-id';

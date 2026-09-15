@@ -7,8 +7,6 @@
 // the outage, and reconnect on its own once the database returns.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('path');
-const Module = require('module');
 
 // Load config/db.js with prisma + the boilerplate migration stubbed out, so
 // the supervisor's state machine can be driven deterministically.

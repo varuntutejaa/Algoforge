@@ -45,8 +45,8 @@ jobs:
           ignore-unfixed: true
 
   # ------------------------------------------------------------------
-  # Backend CI — deploys itself via Render's GitHub auto-deploy on push
-  # to main (render.yaml blueprint), not from this workflow.
+  # Backend CI. Deployment is Vercel's own git integration, not this
+  # workflow — CI only gates the code, it never ships it.
   # ------------------------------------------------------------------
   ci-backend:
     name: Backend CI (lint, test, audit)

@@ -357,8 +357,7 @@ AlgoForge/
 │   ├── styles/          # Per-page CSS
 │   └── types/           # Shared TS types
 │
-├── docs/DEPLOYMENT.md
-└── .github/workflows/
+└── .github/workflows/     # ci-cd.yml · keepalive.yml
 ```
 
 ---

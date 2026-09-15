@@ -503,7 +503,8 @@ function computeExpected(runner, solutionJs, input) {
     const parse = parsers[runner];
     const print = printers[runner];
     if (!parse || !print) throw new Error(`No parser/printer for runner: ${runner}`);
-    // eslint-disable-next-line no-new-func
+    // The seeded reference solution is our own source, not user input; it is
+    // evaluated here only to compute expected outputs at seed time.
     const fn = new Function(`return (${solutionJs})`)();
     const args = parse(input);
     const ret = fn(...args);

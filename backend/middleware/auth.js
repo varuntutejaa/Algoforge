@@ -144,7 +144,7 @@ async function optionalAuth(req, res, next) {
 
     req.user = await findOrCreateUser(payload);
     next();
-  } catch (error) {
+  } catch {
     req.user = null;
     next();
   }

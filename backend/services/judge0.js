@@ -973,7 +973,7 @@ async function runJudge0Submission(problem, language, sourceCode, testCase) {
         try {
             const txt = await response.text();
             details = ` - ${txt}`;
-        } catch (e) {
+        } catch {
             details = '';
         }
         throw new Error(`Judge0 request failed with status ${response.status}${details}`);
@@ -985,7 +985,7 @@ async function runJudge0Submission(problem, language, sourceCode, testCase) {
     const b64decode = (str) => {
         try {
             return str ? Buffer.from(str, 'base64').toString('utf8') : '';
-        } catch (e) {
+        } catch {
             return str || '';
         }
     };
