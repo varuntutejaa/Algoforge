@@ -203,9 +203,18 @@ a {
 }
 
 /* Forms */
-.contest-form-layout {
+.contest-form {
+  max-width: 520px;
+}
+
+/* When problems are picked by hand the form becomes two columns: the fields
+   stay narrow on the left, and the picker gets a full panel on the right.
+   Crammed into the 520px form column, the tag filters alone wrapped into an
+   unusable wall of chips. */
+.contest-form.contest-form-layout {
+  max-width: 1080px;
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
@@ -214,16 +223,60 @@ a {
   min-width: 0;
 }
 
-.contest-form-right label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #cbd5e1;
-  margin-bottom: 6px;
+.contest-form-right {
+  min-width: 0;
+  position: sticky;
+  top: 24px;
 }
 
-.contest-form {
-  max-width: 520px;
+.contest-form-msg {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.contest-form-msg.ok { color: #22c55e; }
+.contest-form-msg.err { color: #f87171; }
+
+.contest-form-submit {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+}
+
+/* Problem picker panel */
+.problem-picker {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 16px;
+}
+
+.problem-picker-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.problem-picker-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.problem-picker-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+@media (max-width: 900px) {
+  .contest-form.contest-form-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .contest-form-right {
+    position: static;
+  }
 }
 
 .form-group {
@@ -500,6 +553,8 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  max-height: 78px;
+  overflow-y: auto;
 }
 
 .pf-tag-btn {
@@ -557,7 +612,7 @@ a {
 
 /* Problem checkboxes */
 .problem-checkboxes {
-  max-height: 320px;
+  max-height: 46vh;
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -580,6 +635,20 @@ a {
 
 .problem-checkboxes label:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.problem-checkboxes label.selected {
+  background: rgba(96, 165, 250, 0.1);
+}
+
+.problem-checkbox-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .problem-checkboxes label.hidden {

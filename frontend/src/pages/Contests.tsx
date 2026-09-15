@@ -122,7 +122,8 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="contest-form">
+    <form onSubmit={submit} className={`contest-form${mode === 'choose' ? ' contest-form-layout' : ''}`}>
+      <div className="contest-form-left">
       <div className="form-group">
         <label>Title *</label>
         <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Contest title" />
@@ -153,12 +154,26 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
         </select>
       </div>
 
-      {mode === 'random'
-        ? <div className="form-group">
-            <label>Number of Problems</label>
-            <input type="number" value={randomCount} min={1} max={20} onChange={e=>setRandomCount(+e.target.value)} />
-          </div>
-        : <div className="form-group">
+      {mode === 'random' && (
+        <div className="form-group">
+          <label>Number of Problems</label>
+          <input type="number" value={randomCount} min={1} max={20} onChange={e=>setRandomCount(+e.target.value)} />
+        </div>
+      )}
+
+      {msg && <p className={`contest-form-msg${msg.startsWith('\u2713') ? ' ok' : ' err'}`}>{msg}</p>}
+      <button type="submit" disabled={submitting} className="btn btn-primary contest-form-submit">
+        {submitting ? 'Creating\u2026' : 'Create Contest'}
+      </button>
+      </div>
+
+      {mode === 'choose' && (
+        <aside className="contest-form-right">
+          <div className="problem-picker">
+            <div className="problem-picker-head">
+              <h3>Problems</h3>
+              <span className="problem-picker-count">{selected.size} selected</span>
+            </div>
             <div className="problem-picker-toolbar">
               <input className="problem-search-input" placeholder="Search problems…" value={search} onChange={e=>setSearch(e.target.value)} />
               <div className="problem-difficulty-filters">
@@ -177,31 +192,31 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
               </div>
             </div>
             <div className="problem-picker-meta">
-              <span>{visible.length} problems</span>
+              <span>{visible.length} shown</span>
               <div className="problem-picker-actions">
-                <button type="button" className="pf-action-btn" onClick={()=>setSelected(new Set(visible.map(p=>p.id)))}>Select All</button>
-                <button type="button" className="pf-action-btn" onClick={()=>setSelected(s=>{const n=new Set(s);visible.forEach(p=>n.delete(p.id));return n;})}>Deselect All</button>
-                <span style={{ color:'#64748b', fontSize:11 }}>{selected.size} selected</span>
+                <button type="button" className="pf-action-btn" onClick={()=>setSelected(new Set(visible.map(p=>p.id)))}>Select all</button>
+                <button type="button" className="pf-action-btn" onClick={()=>setSelected(s=>{const n=new Set(s);visible.forEach(p=>n.delete(p.id));return n;})}>Clear</button>
               </div>
             </div>
             <div className="problem-checkboxes">
               {visible.map(p => (
-                <label key={p.id}>
+                <label key={p.id} className={selected.has(p.id) ? 'selected' : ''}>
                   <input type="checkbox" checked={selected.has(p.id)} onChange={()=>setSelected(s=>{const n=new Set(s);n.has(p.id)?n.delete(p.id):n.add(p.id);return n;})} />
-                  <span style={{ flex:1, fontSize:14, color:'#e2e8f0' }}>{p.title}</span>
+                  <span className="problem-checkbox-title">{p.title}</span>
                   <div className="problem-tags-inline">
                     <span className={`problem-diff-badge ${p.difficulty.toLowerCase()}`}>{p.difficulty}</span>
                   </div>
                 </label>
               ))}
+              {!visible.length && (
+                <p className="no-results-msg">
+                  {problems.length ? 'No problems match these filters.' : 'Loading problems\u2026'}
+                </p>
+              )}
             </div>
           </div>
-      }
-
-      {msg && <p style={{ fontSize:14, color: msg.startsWith('✓') ? '#22c55e' : '#f87171' }}>{msg}</p>}
-      <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width:'100%', padding:'12px', fontSize:14 }}>
-        {submitting ? 'Creating…' : 'Create Contest'}
-      </button>
+        </aside>
+      )}
     </form>
   );
 }
