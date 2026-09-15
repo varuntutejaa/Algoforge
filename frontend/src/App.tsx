@@ -38,19 +38,21 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          {/* Public: the landing page, the auth screens, and the contest
-              calendar. Everything else is behind sign-in. */}
+          {/* Browsing is open. The actions that record something against an
+              account — running or submitting code, joining or creating a
+              contest, opening or saving a calendar entry — prompt for sign-in
+              at the point of use instead of gating the page. */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/problems" element={<Problems />} />
+          <Route path="/editor/:problemId" element={<Editor />} />
+          <Route path="/contests" element={<Contests />} />
 
-          {/* Everything else requires an account. */}
+          {/* Inherently per-account: there is nothing to show without one. */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/problems" element={<Problems />} />
-            <Route path="/editor/:problemId" element={<Editor />} />
-            <Route path="/contests" element={<Contests />} />
             <Route path="/contest-editor/:code" element={<ContestEditor />} />
             <Route path="/contest-results/:code" element={<ContestResults />} />
             <Route path="/dashboard" element={<Dashboard />} />

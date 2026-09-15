@@ -99,11 +99,8 @@ export default function Navbar() {
       </Link>
 
       <div className="nav-center">
-        {/* Problems and Contests need an account, so only offer them to a
-            signed-in user — a link that immediately bounces to /login reads
-            as a broken link. The calendar stays open to everyone. */}
-        {user && <Link to="/problems">Problems</Link>}
-        {user && <Link to="/contests">Contests</Link>}
+        <Link to="/problems">Problems</Link>
+        <Link to="/contests">Contests</Link>
         <Link to="/calendar">Calendar</Link>
       </div>
 

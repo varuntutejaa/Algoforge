@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { API_BASE_URL } from '@/config/api';
 import type { Contest } from '@/types/contest';
 
@@ -36,7 +37,9 @@ function buildGcalUrl(c: CalContest) {
   else if(c.source==='codechef'){url=`https://www.codechef.com/${c.ccCode}`;details=`CodeChef contest\n${url}`;}
   else if(c.source==='atcoder'){url=`https://atcoder.jp/contests/${c.atId}`;details=`AtCoder contest\n${url}`;}
   else if(c.source==='hackerrank'){url=`https://www.hackerrank.com/contests/${c.hrSlug}`;details=`HackerRank contest\n${url}`;}
-  else{url='https://algoforge-1-mbk5.onrender.com/contests';details=`AlgoForge · Code: ${c.code}\n${url}`;}
+  // Points at wherever this build is served from; the old hard-coded Render
+  // host was decommissioned and put a dead link in people's calendars.
+  else{url=`${window.location.origin}/contests`;details=`AlgoForge · Code: ${c.code}\n${url}`;}
   const p=new URLSearchParams({action:'TEMPLATE',text:c.title,dates:`${g(c.startsAt)}/${g(c.endsAt)}`,details,location:url});
   return `https://calendar.google.com/calendar/render?${p}`;
 }
@@ -92,6 +95,8 @@ function TimeColumn({ cls='week-time-col' }: { cls?: string }) {
 
 // Sliding event detail panel
 function EventPanel({ contest, onClose }: { contest: CalContest|null; onClose:()=>void }) {
+  const { require: requireAuth } = useRequireAuth();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const status = contest ? getStatus(contest) : 'upcoming';
   const isOpen = !!contest;
@@ -139,9 +144,19 @@ function EventPanel({ contest, onClose }: { contest: CalContest|null; onClose:()
     if (contest!.source==='codechef') return <a className={epBtnCls} href={`https://www.codechef.com/${contest!.ccCode}`} target="_blank" rel="noopener noreferrer"><PlatformLogo source="codechef" /> Open on CodeChef ↗</a>;
     if (contest!.source==='atcoder') return <a className={epBtnCls} href={`https://atcoder.jp/contests/${contest!.atId}`} target="_blank" rel="noopener noreferrer"><PlatformLogo source="atcoder" /> Open on AtCoder ↗</a>;
     if (contest!.source==='hackerrank') return <a className={epBtnCls} href={`https://www.hackerrank.com/contests/${contest!.hrSlug}`} target="_blank" rel="noopener noreferrer"><PlatformLogo source="hackerrank" /> Open on HackerRank ↗</a>;
-    if (status==='active') return <Link to={`/contest-editor/${contest!.code}`} className={epBtnCls}>Enter Contest →</Link>;
+    // AlgoForge's own contests lead to per-account pages, so prompt for
+    // sign-in here rather than letting the route bounce the user to /login.
+    const go = (to: string, why: string) => (e: React.MouseEvent) => {
+      if (!requireAuth(why)) e.preventDefault();
+      else navigate(to);
+    };
+    if (status==='active') {
+      return <a href={`/contest-editor/${contest!.code}`} className={epBtnCls}
+        onClick={go(`/contest-editor/${contest!.code}`, 'Sign in to enter the contest.')}>Enter Contest →</a>;
+    }
     if (status==='upcoming') return <Link to="/contests" className={epBtnCls}>View in Contests</Link>;
-    return <Link to={`/contest-results/${contest!.code}`} className={epBtnCls}>View Results</Link>;
+    return <a href={`/contest-results/${contest!.code}`} className={epBtnCls}
+      onClick={go(`/contest-results/${contest!.code}`, 'Sign in to view contest results.')}>View Results</a>;
   }
 
   return (
@@ -220,7 +235,8 @@ function EventPanel({ contest, onClose }: { contest: CalContest|null; onClose:()
                 {copied ? '✓ Copied!' : 'Copy Code'}
               </button>
             )}
-            <a href={buildGcalUrl(contest)} target="_blank" rel="noopener noreferrer" className="ep-btn ep-btn-gcal">
+            <a href={buildGcalUrl(contest)} target="_blank" rel="noopener noreferrer" className="ep-btn ep-btn-gcal"
+              onClick={(e) => { if (!requireAuth('Sign in to add contests to your calendar.')) e.preventDefault(); }}>
               <img src="https://calendar.google.com/googlecalendar/images/favicon_v2014_1.ico" className="gcal-logo" alt="gcal" />
               Add to Google Calendar
             </a>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview, fetchSolvedIds } from '@/api/problems';
 import { pushSolutionToGithub } from '@/api/github';
 import DiffBadge from '@/components/ui/DiffBadge';
@@ -113,6 +114,7 @@ export default function Editor() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user, idToken, getHeaders } = useAuth();
+  const { require: requireAuth } = useRequireAuth();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [probLoading, setProbLoading] = useState(true);
@@ -261,13 +263,11 @@ export default function Editor() {
 
   async function execute(action: 'run'|'submit') {
     if (!monacoRef.current || !problem) return;
-    // Running code is open to everyone; submitting records a result against
-    // an account, so that is where sign-in is required.
-    if (action === 'submit' && !idToken) {
-      toast.error('Sign in to submit your solution.');
-      navigate('/login', { state: { from: `/editor/${problemId}` } });
-      return;
-    }
+    // Both run and submit execute code against the judge, so both need an
+    // account. Browsing and reading the problem stay open.
+    if (!requireAuth(action === 'submit'
+      ? 'Sign in to submit your solution.'
+      : 'Sign in to run your code.')) return;
     const src = monacoRef.current.getValue();
     action==='run' ? setRunning(true) : setSubmitting(true); setResults(null);
     setPushOffer('idle'); setPushedUrl(null);

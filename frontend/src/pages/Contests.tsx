@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { fetchMyContests, fetchAvailableContests, createContest, joinContest, fetchLeaderboard } from '@/api/contests';
 import { fetchProblems } from '@/api/problems';
 import type { Contest, LeaderboardEntry } from '@/types/contest';
@@ -83,6 +84,7 @@ function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void
 
 function CreateForm({ onCreated }: { onCreated: () => void }) {
   const { getHeaders } = useAuth();
+  const { require: requireAuth } = useRequireAuth();
   const [problems, setProblems] = useState<Problem[]>([]);
   const [mode, setMode] = useState<'random'|'choose'>('random');
   const [search, setSearch] = useState(''), [diff, setDiff] = useState('all'), [tagF, setTagF] = useState('');
@@ -108,6 +110,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAuth('Sign in to create a contest.')) return;
     if (!title.trim()) { setMsg('Enter a contest title'); return; }
     const [yr,mo,dy] = startDate.split('-').map(Number), [hr,mn] = startTime.split(':').map(Number);
     const sa = new Date(yr,mo-1,dy,hr,mn,0,0);
@@ -225,6 +228,7 @@ type Tab = 'my' | 'create' | 'join';
 
 export default function Contests() {
   const { getHeaders } = useAuth();
+  const { signedIn, require: requireAuth } = useRequireAuth();
   const [tab, setTab] = useState<Tab>('my');
   const [myC, setMyC] = useState<Contest[]>([]);
   const [avail, setAvail] = useState<Contest[]>([]);
@@ -236,15 +240,23 @@ export default function Contests() {
   const interval = useRef<ReturnType<typeof setInterval>|null>(null);
 
   const load = useCallback(async () => {
+    // Both endpoints are per-account. A signed-out visitor can still read the
+    // page and use Join/Create, which prompt for sign-in at the point of use.
+    if (!signedIn) { setMyC([]); setAvail([]); setLoadError(''); setLoading(false); return; }
     try {
       const [my, av] = await Promise.all([fetchMyContests(getHeaders()), fetchAvailableContests(getHeaders())]);
       setMyC(my); setAvail(av); setLoadError('');
     } catch (e: any) {
       setLoadError(e?.message || 'Failed to load contests');
     } finally { setLoading(false); }
-  }, [getHeaders]);
+  }, [getHeaders, signedIn]);
 
-  useEffect(() => { load(); interval.current = setInterval(load, 30000); return () => { if(interval.current) clearInterval(interval.current); }; }, [load]);
+  useEffect(() => {
+    load();
+    if (!signedIn) return;
+    interval.current = setInterval(load, 30000);
+    return () => { if (interval.current) clearInterval(interval.current); };
+  }, [load, signedIn]);
 
   function filter(list: Contest[]) {
     return list.filter(c => {
@@ -259,6 +271,7 @@ export default function Contests() {
   }
 
   async function handleJoin() {
+    if (!requireAuth('Sign in to join a contest.')) return;
     const code = joinCode.trim().toUpperCase();
     if (!code || code.length < 4) { setJoinMsg('Enter a valid contest code'); return; }
     setJoining(true); setJoinMsg('');
