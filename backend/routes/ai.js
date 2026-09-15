@@ -18,7 +18,11 @@ const aiLimiter = rateLimit({
     keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
-router.use(requireAuth, aiLimiter);
+// Applied per route, not via router.use(). This router is mounted at '/api',
+// so a path-less router.use() would gate *every* /api/* request that reaches
+// it — including routes mounted later, such as the public GitHub OAuth
+// callback, which arrives with no Authorization header.
+const protect = [requireAuth, aiLimiter];
 
 async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTokens }) {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -58,7 +62,7 @@ async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTo
     return content;
 }
 
-router.post('/review', async (req, res) => {
+router.post('/review', protect, async (req, res) => {
     const { problemId, code, language } = req.body;
     if (!problemId || !code) return res.status(400).json({ error: 'Missing problemId or code' });
 
@@ -117,7 +121,7 @@ Please review my solution.`;
     }
 });
 
-router.post('/hint', async (req, res) => {
+router.post('/hint', protect, async (req, res) => {
     const { problemId, hintNumber, code, language, elapsedSeconds } = req.body;
     if (!problemId || !hintNumber) return res.status(400).json({ error: 'Missing problemId or hintNumber' });
 
