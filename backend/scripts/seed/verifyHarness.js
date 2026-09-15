@@ -21,6 +21,7 @@ const problems = require('./index');
 const { tpl, computeExpected } = require('./lib');
 const pythonRefs = require('./pythonRefs');
 const compiledRefs = require('./compiledRefs');
+const structRefs = require('./structRefs');
 const { buildJudgeSource } = require('../../services/judge0');
 
 const langArg = (process.argv.find((a) => a.startsWith('--lang=')) || '--lang=both').split('=')[1];
@@ -114,7 +115,7 @@ function main() {
         // Compile the C/C++/Java references for this problem once, if present.
         const compiled = {};
         for (const lang of ['c', 'cpp', 'java']) {
-            const ref = compiledRefs[p.id]?.[lang];
+            const ref = compiledRefs[p.id]?.[lang] || structRefs[p.id]?.[lang];
             if (!ref || !LANGS.includes(lang)) continue;
             try {
                 compiled[lang] = COMPILERS[lang](buildJudgeSource({ runner: p.runner }, lang, ref));
@@ -151,11 +152,12 @@ function main() {
                 }
             }
 
-            if (LANGS.includes('python') && pythonRefs[p.id]) {
+            const pyRef = pythonRefs[p.id] || (structRefs[p.id] && structRefs[p.id].python);
+            if (LANGS.includes('python') && pyRef) {
                 cases++;
                 pyShapes.add(p.runner);
                 try {
-                    const source = buildJudgeSource({ runner: p.runner }, 'python', pythonRefs[p.id]);
+                    const source = buildJudgeSource({ runner: p.runner }, 'python', pyRef);
                     const out = runPython(source, t.input);
                     if (out.trim() === expected.trim()) pass++;
                     else failures.push({ id: p.id, lang: 'python', test: t.name, got: out.trim().slice(0, 120), want: expected.trim().slice(0, 120) });

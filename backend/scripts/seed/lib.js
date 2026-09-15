@@ -12,6 +12,9 @@
 // returns { c, cpp, java, js, python } starter stubs whose signatures match
 // the corresponding harness calling convention.
 // ---------------------------------------------------------------------------
+const { structShapes, computeStructExpected } = require('./libStruct');
+const { tplStruct } = require('./tplStruct');
+
 const tpl = {
     'two-sum': () => ({
         c: 'int* twoSum(int* nums, int numsSize, int target, int* returnSize) {\n    // Write your code here\n    *returnSize = 0;\n    return NULL;\n}',
@@ -493,6 +496,10 @@ const printers = {
 // Expected-output computation from the JS reference solution
 // ---------------------------------------------------------------------------
 function computeExpected(runner, solutionJs, input) {
+    // Linked-list and tree shapes parse into real node structures, so they are
+    // handled by libStruct which owns those wire formats.
+    if (structShapes[runner]) return computeStructExpected(runner, solutionJs, input);
+
     const parse = parsers[runner];
     const print = printers[runner];
     if (!parse || !print) throw new Error(`No parser/printer for runner: ${runner}`);
@@ -503,4 +510,4 @@ function computeExpected(runner, solutionJs, input) {
     return print(ret, args);
 }
 
-module.exports = { tpl, parsers, printers, computeExpected };
+module.exports = { tpl: { ...tpl, ...tplStruct }, parsers, printers, computeExpected };
