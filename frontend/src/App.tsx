@@ -14,6 +14,7 @@ import ContestEditor from './pages/ContestEditor';
 import ContestResults from './pages/ContestResults';
 import Dashboard from './pages/Dashboard';
 import Submissions from './pages/Submissions';
+import Settings from './pages/Settings';
 
 const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor'];
 
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/contest-results/:code" element={<ContestResults />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/submissions" element={<Submissions />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
 
           {/* Fallback */}

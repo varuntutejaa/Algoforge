@@ -81,6 +81,7 @@ function ProfileMenu() {
       <div className={`profile-dropdown${open ? ' open' : ''}`}>
         <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
         <Link to="/submissions" onClick={() => setOpen(false)}>My Submissions</Link>
+        <Link to="/settings" onClick={() => setOpen(false)}>Settings</Link>
         <button onClick={async () => { await logout(); navigate('/'); }}>Logout</button>
       </div>
     </div>

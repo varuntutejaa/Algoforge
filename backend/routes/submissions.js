@@ -4,6 +4,7 @@ const router = express.Router();
 const { prisma } = require('../config/prismaClient');
 const { getVerdict, getSubmissionMetrics, updateStreak } = require('../utils/profileHelpers');
 const { formatProblem, getDailyProblemId } = require('../services/problems');
+const { syncAcceptedSolution } = require('../services/githubSync');
 const { languageIds, runTestSuite } = require('../services/judge0');
 
 const submitLimiter = rateLimit({
@@ -110,6 +111,20 @@ router.post('/', submitLimiter, async (req, res) => {
             });
         }
 
+        // Push to the user's GitHub only for an accepted *submission*, never a
+        // trial run. Failures here are reported alongside the verdict but never
+        // change it — a GitHub outage must not cost someone a solve.
+        let githubSync = null;
+        if (user && isSubmit && passed && verdict === "Accepted") {
+            githubSync = await syncAcceptedSolution({
+                user,
+                problem: problemDoc,
+                language,
+                sourceCode,
+                metrics: { runtime, memory }
+            });
+        }
+
         res.json({
             success: true,
             passed,
@@ -117,7 +132,8 @@ router.post('/', submitLimiter, async (req, res) => {
             totalTests: results.length,
             passedTests: results.filter((result) => result.passed).length,
             results,
-            verdict
+            verdict,
+            ...(githubSync ? { githubSync } : {})
         });
     } catch (error) {
         console.log(error);

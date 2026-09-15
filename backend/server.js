@@ -14,6 +14,7 @@ const profileRoutes = require('./routes/profile');
 const problemsRoutes = require('./routes/problems');
 const aiRoutes = require('./routes/ai');
 const submissionsRoutes = require('./routes/submissions');
+const githubRoutes = require('./routes/github');
 
 const app = express();
 app.use(compression());
@@ -58,6 +59,7 @@ app.use('/profile', profileRoutes);
 app.use('/problems', problemsRoutes);
 app.use('/api', aiRoutes);
 app.use('/submit-code', optionalAuth, submissionsRoutes);
+app.use('/api/github', githubRoutes);
 
 const PORT = process.env.PORT || 8000;
 

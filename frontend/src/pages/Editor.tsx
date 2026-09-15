@@ -268,7 +268,19 @@ export default function Editor() {
     try {
       const res = await submitCode({ problemId, language, sourceCode: src, userId: user?.id, action }, getHeaders());
       setResults({ ...res, action });
-      if (action==='submit' && res.passed && res.verdict==='Accepted') { setIsSolved(true); setReviewUnlocked(true); launchCelebration(); }
+      if (action==='submit' && res.passed && res.verdict==='Accepted') {
+        setIsSolved(true); setReviewUnlocked(true); launchCelebration();
+        // GitHub sync is best-effort on the server, so report either outcome
+        // without implying the solve itself failed.
+        const sync = res.githubSync;
+        if (sync) {
+          if (sync.status === 'created' || sync.status === 'updated') {
+            toast.success(`Pushed to ${sync.repo}`);
+          } else if (sync.status === 'reconnect' || sync.status === 'missing_repo') {
+            toast.error(sync.message || 'GitHub sync needs attention — check Settings.');
+          }
+        }
+      }
     } catch { setResults({ success:false, message:'Could not reach the backend server.' }); }
     finally { action==='run' ? setRunning(false) : setSubmitting(false); }
   }

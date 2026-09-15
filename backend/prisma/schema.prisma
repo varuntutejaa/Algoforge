@@ -28,6 +28,15 @@ model User {
   lastActivityDate    DateTime? @map("last_activity_date") @db.Date
   createdAt           DateTime  @default(now()) @map("created_at")
 
+  // GitHub solution sync. The access token is stored encrypted (AES-256-GCM,
+  // see services/crypto.js) because it can write to the user's repositories;
+  // it is requested with the narrow `public_repo` scope rather than `repo`.
+  githubToken         String?   @map("github_token")
+  githubUsername      String?   @map("github_username")
+  githubRepo          String?   @map("github_repo")
+  githubSyncEnabled   Boolean   @default(false) @map("github_sync_enabled")
+  githubConnectedAt   DateTime? @map("github_connected_at")
+
   solvedProblems        SolvedProblem[]
   submissions           Submission[]
   createdContests        Contest[]            @relation("ContestCreator")

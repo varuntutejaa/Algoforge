@@ -28,6 +28,8 @@ export type Language = 'c' | 'cpp' | 'java' | 'js' | 'python';
 export interface SubmitResult {
   passed: boolean;
   verdict: string;
+  /** Present only when an accepted submission was pushed to GitHub. */
+  githubSync?: import('@/api/github').GithubSyncResult;
   results: Array<{
     name: string;
     passed: boolean;
