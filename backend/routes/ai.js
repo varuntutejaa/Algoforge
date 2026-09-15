@@ -5,7 +5,10 @@ const router = express.Router();
 const { prisma } = require('../config/prismaClient');
 const { requireAuth } = require('../middleware/auth');
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Groq retires models on its own schedule, and a decommissioned id fails every
+// request with model_not_found — which is how hints and review silently broke
+// in production. Keep it overridable so the next retirement is a config change.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 const aiLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -41,7 +44,18 @@ async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTo
         throw error;
     }
     const data = await groqRes.json();
-    return data.choices?.[0]?.message?.content?.trim();
+    // Reasoning models spend part of the token budget on a separate
+    // `reasoning` field before emitting `content`; an empty content with a
+    // finish_reason of "length" means the budget ran out mid-thought rather
+    // than the model having nothing to say.
+    const message = data.choices?.[0]?.message;
+    const content = message?.content?.trim();
+    if (!content && data.choices?.[0]?.finish_reason === 'length') {
+        const error = new Error('AI response was cut off before any answer was produced');
+        error.detail = 'increase max_tokens for this model';
+        throw error;
+    }
+    return content;
 }
 
 router.post('/review', async (req, res) => {
@@ -94,7 +108,7 @@ ${code.trim().slice(0, 2000)}
 
 Please review my solution.`;
 
-        const review = await callGroq(groqKey, { systemPrompt, userMessage, temperature: 0.4, maxTokens: 700 });
+        const review = await callGroq(groqKey, { systemPrompt, userMessage, temperature: 0.4, maxTokens: 1600 });
         res.json({ review: review || 'Review unavailable.' });
     } catch (err) {
         console.error('Review endpoint error:', err);
@@ -107,6 +121,14 @@ router.post('/hint', async (req, res) => {
     const { problemId, hintNumber, code, language, elapsedSeconds } = req.body;
     if (!problemId || !hintNumber) return res.status(400).json({ error: 'Missing problemId or hintNumber' });
 
+    // hintNumber indexes a fixed list of three prompt personalities; anything
+    // outside 1-3 selected `undefined` and sent a malformed prompt to a paid
+    // API rather than failing.
+    const hintIndex = Number(hintNumber);
+    if (!Number.isInteger(hintIndex) || hintIndex < 1 || hintIndex > 3) {
+        return res.status(400).json({ error: 'hintNumber must be 1, 2, or 3' });
+    }
+
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) return res.status(503).json({ error: 'AI service not configured' });
 
@@ -117,11 +139,12 @@ router.post('/hint', async (req, res) => {
         const title       = problemDoc.title || '';
         const description = (problemDoc.description || []).join('\n');
         const constraints = (problemDoc.constraints || []).join('\n');
-        const examples    = (problemDoc.examples || []).map((ex, i) =>
-            `Example ${i + 1}:\n  Input: ${ex.input}\n  Output: ${ex.output}${ex.explanation ? '\n  Explanation: ' + ex.explanation : ''}`
-        ).join('\n');
+        // `example` is a single string on the Problem model, and a TestCase
+        // stores `expected` — reading `examples`/`tc.output` silently produced
+        // an empty example block and "expected=undefined" on every hint.
+        const examples    = problemDoc.example || '';
         const testCases   = (problemDoc.testCases || []).slice(0, 3).map((tc, i) =>
-            `Test ${i + 1}: input=${JSON.stringify(tc.input)} expected=${JSON.stringify(tc.output)}`
+            `Test ${i + 1}: input=${JSON.stringify(tc.input)} expected=${JSON.stringify(tc.expected)}`
         ).join('\n');
 
         const elapsedMin  = Math.floor((elapsedSeconds || 0) / 60);
@@ -132,7 +155,7 @@ router.post('/hint', async (req, res) => {
             `You are giving Hint 1 of 3. The user has spent ~${elapsedMin} minutes on this problem. Give a very gentle conceptual nudge — point them toward the right problem-solving pattern or ask a guiding question. Do NOT name the algorithm or data structure directly. Do NOT reveal any implementation step. 2-3 sentences max.`,
             `You are giving Hint 2 of 3. The user has spent ~${elapsedMin} minutes. Look at their current code approach if provided. If they are on the wrong track, gently redirect them. If on the right track, hint at the key insight they are missing without revealing the solution. Mention time/space complexity to think about if relevant. 3-4 sentences max.`,
             `You are giving Hint 3 of 3. The user has spent ~${elapsedMin} minutes. Examine their code closely. Identify the specific step or logic gap that is blocking them. Give a concrete implementation hint — describe what to do next without writing the code for them. You may reference a specific line or concept in their code. 4-5 sentences max.`
-        ][hintNumber - 1];
+        ][hintIndex - 1];
 
         const systemPrompt = `You are a helpful coding mentor giving progressive hints for a LeetCode-style problem.
 ${hintPersonality}
@@ -159,9 +182,9 @@ ${testCases}
 
 ${codeSnippet ? `User's current ${language || 'code'} (${elapsedMin} min in):\n\`\`\`\n${codeSnippet}\n\`\`\`` : `The user has not written any code yet (${elapsedMin} min in).`}
 
-Give Hint ${hintNumber}.`;
+Give Hint ${hintIndex}.`;
 
-        const hint = await callGroq(groqKey, { systemPrompt, userMessage, temperature: 0.5, maxTokens: 300 });
+        const hint = await callGroq(groqKey, { systemPrompt, userMessage, temperature: 0.5, maxTokens: 900 });
         res.json({ hint: hint || 'No hint available.' });
     } catch (err) {
         console.error('Hint endpoint error:', err);
