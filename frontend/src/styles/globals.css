@@ -287,3 +287,17 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     .settings-repo-edit { width: 100%; }
     .settings-repo-edit .field-input { flex: 1; width: auto; }
 }
+
+/* Full-page hold while Firebase restores a persisted session. Without the
+   min-height the page collapses to a single line and the layout jumps once
+   the real route renders. */
+.route-loading{
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  /* Self-contained: .loading-text is defined in page-scoped stylesheets, and
+     this renders above any page. */
+  color: #94a3b8;
+  font-size: 14px;
+}

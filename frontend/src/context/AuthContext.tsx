@@ -40,9 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
-  // Held so getHeaders can always mint a fresh token, even if a render hasn't
-  // committed the latest one into state yet.
+  // Held so getHeaders can always reach the latest token, even if a render
+  // hasn't committed it into state yet — which is the case on the first paint
+  // after a reload, while Firebase is still restoring the session.
   const fbUserRef = useRef<FirebaseUser | null>(null);
+  const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     // onIdTokenChanged (rather than onAuthStateChanged) also fires on silent
@@ -51,12 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onIdTokenChanged(auth, async (fbUser) => {
       fbUserRef.current = fbUser;
       if (!fbUser) {
+        tokenRef.current = null;
         localStorage.removeItem('algoforge-user');
         setState({ user: null, idToken: null, loading: false });
         return;
       }
       try {
         const token = await fbUser.getIdToken();
+        tokenRef.current = token;
         setState((prev) => {
           // Heal a session that was stored before the avatar was carried
           // through, so an already-signed-in user doesn't keep showing a
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...prev, user, idToken: token, loading: false };
         });
       } catch {
+        tokenRef.current = null;
         setState((prev) => ({ ...prev, idToken: null, loading: false }));
       }
     });
@@ -80,19 +85,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getHeaders = useCallback(
     (extra: HeadersInit = {}): HeadersInit => {
-      return state.idToken
-        ? { Authorization: `Bearer ${state.idToken}`, ...extra }
-        : { ...extra };
+      // Prefer state, but fall back to the token Firebase has already restored
+      // into the SDK. On the first render after a reload the listener may not
+      // have committed it yet, and without this fallback those early requests
+      // go out unauthenticated and 401.
+      const token = state.idToken || tokenRef.current;
+      return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
     },
     [state.idToken],
   );
 
   const login = useCallback((user: AlgoforgeUser, idToken: string) => {
+    tokenRef.current = idToken;
     localStorage.setItem('algoforge-user', JSON.stringify(user));
     setState({ user, idToken, loading: false });
   }, []);
 
   const logout = useCallback(async () => {
+    tokenRef.current = null;
     await fbSignOut(auth);
     localStorage.removeItem('algoforge-user');
     setState({ user: null, idToken: null, loading: false });

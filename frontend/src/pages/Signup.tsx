@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
@@ -26,6 +26,10 @@ function getPasswordStrength(pw: string) {
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // ProtectedRoute forwards the page the user was trying to reach; send them
+  // back there after signing in rather than to a generic landing page.
+  const redirectTo = (location.state as { from?: string } | null)?.from || '/problems';
   const toast = useToast();
   const { login } = useAuth();
   const [name, setName] = useState('');
@@ -47,7 +51,7 @@ export default function Signup() {
       if (!res.success) { toast.error(res.message || 'Sign-up failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome!');
-      setTimeout(() => navigate('/problems'), 600);
+      setTimeout(() => navigate(redirectTo), 600);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
@@ -73,7 +77,7 @@ export default function Signup() {
       if (!res.success) { toast.error(res.message || 'Signup failed'); return; }
       login(res.user, idToken);
       toast.success('Account created!');
-      setTimeout(() => navigate('/problems'), 900);
+      setTimeout(() => navigate(redirectTo), 900);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }

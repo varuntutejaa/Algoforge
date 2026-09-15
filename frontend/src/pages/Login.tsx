@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
@@ -10,6 +10,10 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // ProtectedRoute forwards the page the user was trying to reach; send them
+  // back there after signing in rather than to a generic landing page.
+  const redirectTo = (location.state as { from?: string } | null)?.from || '/problems';
   const toast = useToast();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -42,7 +46,7 @@ export default function Login() {
       if (!res.success) { toast.error(res.message || 'Sign-in failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome!');
-      setTimeout(() => navigate('/problems'), 600);
+      setTimeout(() => navigate(redirectTo), 600);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
@@ -59,7 +63,7 @@ export default function Login() {
       if (!res.success) { toast.error(res.message || 'Login failed'); return; }
       login(res.user, idToken);
       toast.success('Welcome back!');
-      setTimeout(() => navigate('/problems'), 800);
+      setTimeout(() => navigate(redirectTo), 800);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
