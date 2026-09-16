@@ -7,9 +7,14 @@ import { TableSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
 import type { Problem } from '@/types/problem';
 
 function getDailyProblem(problems: Problem[]): Problem | null {
-  if (!problems.length) return null;
+  // Only judged problems are eligible. Picking from the full list could land
+  // on one of the design/open-ended problems, which would present a challenge
+  // nobody can actually submit.
+  const eligible = problems.filter((p) => (p.testCaseCount ?? 0) > 0);
+  const pool = eligible.length ? eligible : problems;
+  if (!pool.length) return null;
   const now = new Date(), start = new Date(now.getFullYear(), 0, 0);
-  return problems[Math.floor((now.getTime() - start.getTime()) / 86400000) % problems.length];
+  return pool[Math.floor((now.getTime() - start.getTime()) / 86400000) % pool.length];
 }
 
 export default function Problems() {
