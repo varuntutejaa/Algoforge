@@ -18,11 +18,27 @@ const aiLimiter = rateLimit({
     keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
+const reviewLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 1,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip),
+    handler: (req, res) => {
+        const resetTime = req.rateLimit?.resetTime?.getTime?.() || Date.now() + 60 * 1000;
+        const retryAfterSeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
+        res.status(429).json({
+            error: `Code review is rate limited. Try again in ${retryAfterSeconds} seconds.`
+        });
+    }
+});
+
 // Applied per route, not via router.use(). This router is mounted at '/api',
 // so a path-less router.use() would gate *every* /api/* request that reaches
 // it — including routes mounted later, such as the public GitHub OAuth
 // callback, which arrives with no Authorization header.
-const protect = [requireAuth, aiLimiter];
+const protectHint = [requireAuth, aiLimiter];
+const protectReview = [requireAuth, reviewLimiter, aiLimiter];
 
 async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTokens }) {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -62,7 +78,7 @@ async function callGroq(groqKey, { systemPrompt, userMessage, temperature, maxTo
     return content;
 }
 
-router.post('/review', protect, async (req, res) => {
+router.post('/review', protectReview, async (req, res) => {
     const { problemId, code, language } = req.body;
     if (!problemId || !code) return res.status(400).json({ error: 'Missing problemId or code' });
 
@@ -121,7 +137,7 @@ Please review my solution.`;
     }
 });
 
-router.post('/hint', protect, async (req, res) => {
+router.post('/hint', protectHint, async (req, res) => {
     const { problemId, hintNumber, code, language, elapsedSeconds } = req.body;
     if (!problemId || !hintNumber) return res.status(400).json({ error: 'Missing problemId or hintNumber' });
 

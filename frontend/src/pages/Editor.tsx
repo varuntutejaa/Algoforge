@@ -13,6 +13,7 @@ import type { ProblemDetail, Language } from '@/types/problem';
 const MONACO_LANG: Record<Language, string> = { c:'c', cpp:'cpp', java:'java', js:'javascript', python:'python' };
 const MAX_SOLUTIONS = 5;
 const HINT_UNLOCK_SEC = [4*60, 9*60, 14*60];
+const REVIEW_COOLDOWN_SEC = 60;
 
 function codeKey(pid: string, lang: Language, slot: number) { return slot===0 ? `af-code-${pid}-${lang}` : `af-code-${pid}-${lang}-s${slot}`; }
 function slotCountKey(pid: string) { return `af-sol-count-${pid}`; }
@@ -144,6 +145,7 @@ export default function Editor() {
   const [aiLoading, setAiLoading] = useState(false);
   const [isHint, setIsHint] = useState(false);
   const [reviewUnlocked, setReviewUnlocked] = useState(false);
+  const [reviewCooldown, setReviewCooldown] = useState(0);
 
   const [elapsed, setElapsed] = useState(0);
   const [hintUnlocked, setHintUnlocked] = useState([false, false, false]);
@@ -201,6 +203,14 @@ export default function Editor() {
     window.addEventListener('beforeunload', stopTimer);
     return () => { stopTimer(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('beforeunload', stopTimer); };
   }, [problem, problemId]);
+
+  useEffect(() => {
+    if (reviewCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setReviewCooldown((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [reviewCooldown]);
 
   useEffect(() => {
     const splitter = splitterRef.current, left = leftPanelRef.current;
@@ -316,11 +326,16 @@ export default function Editor() {
     setAiText(text); setAiLoading(false);
   }
   async function openReview() {
-    if (!reviewUnlocked) return;
+    if (!reviewUnlocked || aiLoading || reviewCooldown > 0) return;
     setAiTitle('Code Review'); setIsHint(false); setAiText(''); setAiLoading(true); setAiOpen(true);
     const src = monacoRef.current?.getValue() || '';
-    const text = await fetchCodeReview({ problemId, code: src, language }, getHeaders());
-    setAiText(text); setAiLoading(false);
+    try {
+      const text = await fetchCodeReview({ problemId, code: src, language }, getHeaders());
+      setAiText(text);
+    } finally {
+      setAiLoading(false);
+      setReviewCooldown(REVIEW_COOLDOWN_SEC);
+    }
   }
   function fmtTime(secs: number) { return `${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`; }
 
@@ -333,6 +348,14 @@ export default function Editor() {
   // letting the user write a solution and only then be told.
   const testCount = problem.testCaseCount ?? problem.testCases?.length ?? 0;
   const judgeable = testCount > 0;
+  const reviewDisabled = !reviewUnlocked || aiLoading || reviewCooldown > 0;
+  const reviewSubText = !reviewUnlocked
+    ? 'solve first to unlock'
+    : reviewCooldown > 0
+      ? `try again in ${reviewCooldown}s`
+      : aiLoading
+        ? (isHint ? 'AI assist busy' : 'reviewing...')
+        : 'get AI feedback';
 
   return (
     <div className="editor-shell">
@@ -396,12 +419,12 @@ export default function Editor() {
             })}
           </div>
 
-          <button disabled={!reviewUnlocked} onClick={openReview}
+          <button disabled={reviewDisabled} onClick={openReview}
             className={`review-code-btn${reviewUnlocked ? ' unlocked' : ''}`}>
             <span className="review-lock-icon">{reviewUnlocked ? <IconSparkle width={14} height={14} /> : <IconLock width={14} height={14} />}</span>
             <div>
               <div className="review-btn-label">Review My Code</div>
-              <div className="review-btn-sub">{reviewUnlocked ? 'get AI feedback' : 'solve first to unlock'}</div>
+              <div className="review-btn-sub">{reviewSubText}</div>
             </div>
           </button>
 
