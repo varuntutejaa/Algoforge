@@ -156,6 +156,14 @@ router.post('/hint', protectHint, async (req, res) => {
         const problemDoc = await prisma.problem.findUnique({ where: { id: problemId }, include: { testCases: true } });
         if (!problemDoc) return res.status(404).json({ error: 'Problem not found' });
 
+        // A hint asked for after the problem is already solved needs a
+        // different brief. Told to "identify the gap blocking them" while
+        // looking at working code, the model invents a fault that isn't there
+        // and sends the user to break a correct solution.
+        const alreadySolved = Boolean(await prisma.solvedProblem.findUnique({
+            where: { userId_problemId: { userId: req.user.id, problemId } }
+        }));
+
         const title       = problemDoc.title || '';
         const description = (problemDoc.description || []).join('\n');
         const constraints = (problemDoc.constraints || []).join('\n');
@@ -177,8 +185,12 @@ router.post('/hint', protectHint, async (req, res) => {
             `You are giving Hint 3 of 3. The user has spent ~${elapsedMin} minutes. Examine their code closely. Identify the specific step or logic gap that is blocking them. Give a concrete implementation hint — describe what to do next without writing the code for them. You may reference a specific line or concept in their code. 4-5 sentences max.`
         ][hintIndex - 1];
 
+        const solvedPersonality = `The user has ALREADY SOLVED this problem — their code passed every test case. Do not hunt for bugs and do not invent one; there is nothing blocking them. Acknowledge briefly that the solution works, then give them one thing worth thinking about: a complexity consideration, an edge case worth knowing, or a different angle on the problem. 2-4 sentences max.`;
+
+        const personality = alreadySolved ? solvedPersonality : hintPersonality;
+
         const systemPrompt = `You are a helpful coding mentor giving progressive hints for a LeetCode-style problem.
-${hintPersonality}
+${personality}
 Rules:
 - Never provide a complete solution or full algorithm
 - Never write out the final working code
