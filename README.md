@@ -322,7 +322,7 @@ A test that passes against the bug it's meant to catch is worth nothing.
 |---|---|---|
 | Frontend | Vercel | `vite build`; `frontend/vercel.json` rewrites all paths to `index.html` |
 | API | Vercel | Express as a serverless function |
-| Database | Supabase | Postgres via the pooler; migrations with `prisma migrate deploy` |
+| Database | Supabase | Postgres via the pooler; `prisma migrate deploy` runs in the API's production build (`backend/vercel.json`), so a failed migration stops the deploy |
 | Auth | Firebase | Google + email/password |
 | CI | GitHub Actions | `ci-cd.yml` — security scan, backend and frontend jobs on every push and PR |
 | Keepalive | GitHub Actions | `keepalive.yml` pings `/health` every 10 minutes |
@@ -330,7 +330,7 @@ A test that passes against the bug it's meant to catch is worth nothing.
 > **Order matters:** deploy before seeding. Seeding problems whose runners aren't live yet puts
 > ungradeable problems in front of users. Learned the hard way.
 
-CI doesn't deploy — Vercel does that on its own.
+CI doesn't deploy, and neither Vercel project is connected to GitHub: pushing ships nothing. Deploy with `vercel --prod` in `backend/` first (it applies pending migrations), then in `frontend/`.
 
 ---
 
