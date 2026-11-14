@@ -239,15 +239,37 @@ router.post("/create", requireAuth, async (req, res) => {
 
     let contestProblems = [];
 
+    // Only problems with test cases can be in a contest. A design or
+    // open-ended problem has none, so every submit to it is refused with a
+    // 422. Nobody could then solve every problem, so no one would ever be
+    // marked finished and the contest could never end early.
+    const judged = { testCases: { some: {} } };
+
     if (isRandom) {
-      // Pick random problems from the database
       const count = problems?.count || 3;
-      const sampled = await prisma.$queryRaw`SELECT id, title FROM problems ORDER BY random() LIMIT ${count}`;
-      contestProblems = sampled.map((p) => ({ problemId: p.id, title: p.title }));
+      const pool = await prisma.problem.findMany({ where: judged, select: { id: true, title: true } });
+      // Fisher-Yates shuffle, then take the first `count`.
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(i + 1);
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      contestProblems = pool.slice(0, count).map((p) => ({ problemId: p.id, title: p.title }));
     } else if (problems && Array.isArray(problems) && problems.length > 0) {
-      // Use selected problems
-      const problemDocs = await prisma.problem.findMany({ where: { id: { in: problems } } });
-      contestProblems = problemDocs.map((p) => ({ problemId: p.id, title: p.title }));
+      const requested = [...new Set(problems.map(String))];
+      const problemDocs = await prisma.problem.findMany({
+        where: { id: { in: requested }, ...judged },
+        select: { id: true, title: true }
+      });
+      const byId = new Map(problemDocs.map((p) => [p.id, p]));
+      const rejected = requested.filter((id) => !byId.has(id));
+      if (rejected.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `These problems can't be judged automatically, so they can't be in a contest: ${rejected.join(", ")}`
+        });
+      }
+      // Keep the order the creator picked them in.
+      contestProblems = requested.map((id) => ({ problemId: id, title: byId.get(id).title }));
     } else {
       return res.status(400).json({
         success: false,

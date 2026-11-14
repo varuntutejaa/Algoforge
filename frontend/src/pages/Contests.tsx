@@ -29,6 +29,18 @@ function getCountdown(c: Contest) {
   const m = Math.floor(diff/60000), h = Math.floor(m/60); return h ? `${h}h ${m%60}m left` : `${m}m left`;
 }
 
+// The form's date and time inputs are in local time. The date used to come
+// from toISOString(), which is UTC. From midnight to 05:30 in India that is
+// still yesterday, so the default start was in the past and the form refused
+// to submit. Adding the minute to the Date also avoids a ":60" time at :59.
+function localDateTimeInputs(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
+}
+
 function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void }) {
   const { getHeaders } = useAuth();
   const status = getStatus(c), countdown = getCountdown(c);
@@ -91,13 +103,16 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState(''), [desc, setDesc] = useState('');
   const [randomCount, setRandomCount] = useState(5), [duration, setDuration] = useState(60);
-  const now = new Date();
-  const [startDate, setStartDate] = useState(now.toISOString().slice(0,10));
-  const [startTime, setStartTime] = useState(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()+1).padStart(2,'0')}`);
+  const today = localDateTimeInputs(new Date()).date;
+  const [startDate, setStartDate] = useState(() => localDateTimeInputs(new Date(Date.now() + 60_000)).date);
+  const [startTime, setStartTime] = useState(() => localDateTimeInputs(new Date(Date.now() + 60_000)).time);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
-  useEffect(() => { fetchProblems().then(setProblems).catch(() => {}); }, []);
+  // Only judged problems can go in a contest; the server refuses the rest.
+  useEffect(() => {
+    fetchProblems().then(ps => setProblems(ps.filter(p => (p.testCaseCount ?? 0) > 0))).catch(() => {});
+  }, []);
 
   const allTags = Array.from(new Set(problems.flatMap(p => p.tags))).sort();
   const visible = problems.filter(p => {
@@ -138,7 +153,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
       <div className="form-row">
         <div className="form-group">
           <label>Start Date</label>
-          <input type="date" value={startDate} min={now.toISOString().slice(0,10)} onChange={e=>setStartDate(e.target.value)} />
+          <input type="date" value={startDate} min={today} onChange={e=>setStartDate(e.target.value)} />
         </div>
         <div className="form-group">
           <label>Start Time</label>
