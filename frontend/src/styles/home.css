@@ -3,6 +3,11 @@
 .home-page {
   min-height: 100vh;
   overflow: hidden;
+  /* Run the background up behind the transparent navbar, so the glow starts
+     at the top of the window instead of at a hard edge under the bar. The
+     padding puts the content back where it was. */
+  margin-top: calc(-1 * var(--nav-height));
+  padding-top: var(--nav-height);
   background:
     radial-gradient(900px circle at 82% 4%, rgba(37, 99, 235, 0.2), transparent 58%),
     radial-gradient(720px circle at 12% 20%, rgba(14, 165, 233, 0.11), transparent 60%),
@@ -20,14 +25,6 @@
   min-height: calc(88vh - var(--nav-height));
   margin: 0 auto;
   padding: 54px 32px 70px;
-}
-
-.home-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0 32px auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.16), transparent);
 }
 
 .home-hero-content,

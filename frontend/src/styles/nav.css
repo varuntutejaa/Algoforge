@@ -10,8 +10,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255,255,255,0.09);
-  background: rgba(5,5,5,0.92);
+  /* Transparent with no divider, so the bar reads as part of the page rather
+     than a separate strip. It isn't sticky, so nothing scrolls behind it. */
+  background: transparent;
   position: relative;
   z-index: 20;
 }
