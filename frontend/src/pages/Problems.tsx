@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { fetchProblems, fetchSolvedIds } from '@/api/problems';
 import DiffBadge from '@/components/ui/DiffBadge';
+import { IconArrowUp } from '@/components/ui/Icons';
 import { TableSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
 import type { Problem } from '@/types/problem';
 
@@ -16,6 +17,11 @@ function getDailyProblem(problems: Problem[]): Problem | null {
   const now = new Date(), start = new Date(now.getFullYear(), 0, 0);
   return pool[Math.floor((now.getTime() - start.getTime()) / 86400000) % pool.length];
 }
+
+// Rows added each time the user scrolls near the bottom. The full list is
+// still fetched up front, because search, the topic strip and the daily pick
+// all need every problem. Paging only limits how many rows are on the page.
+const PAGE_SIZE = 30;
 
 export default function Problems() {
   const { getHeaders } = useAuth();
@@ -57,10 +63,44 @@ export default function Problems() {
     });
   }, [problems, search, difficulty, tag]);
 
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // A new filter result starts again from the first page.
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filtered]);
+
+  const hasMore = visibleCount < filtered.length;
+
+  // Load the next page when the sentinel below the last row comes within
+  // 400px of the viewport. The observer is rebuilt after every page, so on a
+  // tall screen where the sentinel is still visible it keeps loading until
+  // the screen is full.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisibleCount(c => c + PAGE_SIZE);
+      },
+      { rootMargin: '0px 0px 400px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount]);
+
+  // Show the back-to-top button once the user is more than about a screen down.
+  const [showTop, setShowTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 600);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const DIFFS = ['all', 'easy', 'medium', 'hard'];
 
   return (
-    <div className="problems-page" style={{ height: 'calc(100vh - 74px)' }}>
+    <div className="problems-page">
       {/* Daily Challenge Card */}
       {daily && (
         <div className="daily-card">
@@ -166,7 +206,7 @@ export default function Problems() {
               }
             />
           )}
-          {!loading && !error && filtered.map(p => {
+          {!loading && !error && filtered.slice(0, visibleCount).map(p => {
             const isDaily = p.id === daily?.id;
             const isSolved = solvedSet.has(p.id);
             const visibleTags = p.tags.slice(0, 2);
@@ -201,8 +241,25 @@ export default function Problems() {
               </Link>
             );
           })}
+          {!loading && !error && hasMore && (
+            <div ref={sentinelRef} className="prob-more" aria-hidden="true">
+              Loading more…
+            </div>
+          )}
         </div>
       </div>
+
+      {showTop && (
+        <button
+          type="button"
+          className="scroll-top-btn"
+          onClick={() => window.scrollTo({ top: 0 })}
+          aria-label="Back to top"
+          title="Back to top"
+        >
+          <IconArrowUp width={20} height={20} />
+        </button>
+      )}
     </div>
   );
 }

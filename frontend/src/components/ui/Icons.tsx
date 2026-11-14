@@ -164,3 +164,12 @@ export function IconAlertCircle(props: IconProps) {
     </svg>
   );
 }
+
+export function IconArrowUp(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 19V5" />
+      <path d="M5 12l7-7 7 7" />
+    </svg>
+  );
+}
