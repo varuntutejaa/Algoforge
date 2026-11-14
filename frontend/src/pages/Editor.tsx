@@ -114,7 +114,7 @@ export default function Editor() {
   const { problemId = 'two-sum' } = useParams<{ problemId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
-  const { user, idToken, getHeaders } = useAuth();
+  const { user, getHeaders } = useAuth();
   const { require: requireAuth } = useRequireAuth();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);

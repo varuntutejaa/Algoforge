@@ -6,9 +6,10 @@
   // non-breaking fix available today.
   //
   // Review this file whenever `npm audit` output changes, and remove entries
-  // once vite/tailwindcss ship a fix or are upgraded. (The firebase-related
-  // undici/WebSocket advisories previously allowlisted here are gone as of
-  // 2025-07 — firebase was removed as part of the Cognito migration.)
+  // once the upstream package ships a fix or is upgraded.
+  //
+  // Build tools (vite, tailwindcss, @tailwindcss/vite) are devDependencies so
+  // they stay out of this audit; Vercel installs devDependencies to build.
   "$schema": "https://raw.githubusercontent.com/IBM/audit-ci/main/docs/schema.json",
   "high": true,
   "critical": true,
@@ -19,7 +20,25 @@
     // really a build tool). No sourcemaps are loaded from untrusted input. — 2025-07
     "GHSA-r28c-9q8g-f849",
     // Vite dev-server server.fs.deny bypass — dev server never runs in
-    // production (static build served from S3/CloudFront). — 2025-07
-    "GHSA-fx2h-pf6j-xcff"
+    // production (the static build is served by Vercel). — 2025-07
+    "GHSA-fx2h-pf6j-xcff",
+    // @grpc/grpc-js, reached via firebase > @firebase/firestore. The app
+    // imports only firebase/app and firebase/auth; Firestore is never
+    // imported, and grpc-js is its Node.js transport, so none of it is in the
+    // browser bundle (checked: no grpc or Firestore code in dist/). Even the
+    // latest firebase (13.3.0, @firebase/firestore 4.20.0) pins grpc-js
+    // ~1.9.0, so there is no upgrade that clears it. Allowlisted with the
+    // owner's approval. — 2026-11
+    "GHSA-m9gg-hp2v-232j",
+    // DOMPurify XSS advisories, reached via monaco-editor > dompurify. The
+    // npm monaco-editor package is only a peer dependency and is not bundled:
+    // @monaco-editor/react loads Monaco from jsDelivr at runtime. That copy
+    // has the same old DOMPurify, and Monaco renders only the user's own code
+    // and the editor's built-in hovers, so the exposure is self-XSS at most.
+    // No Monaco release has the fix yet (0.57.0 pins dompurify 3.4.15);
+    // when one does, point the loader at it and remove these. Allowlisted
+    // with the owner's approval. — 2026-11
+    "GHSA-mrv2-3pqr-j5jr",
+    "GHSA-cg2g-xh64-v4q7"
   ]
 }
