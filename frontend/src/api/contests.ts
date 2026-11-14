@@ -30,6 +30,35 @@ export async function fetchLeaderboard(code: string, headers: HeadersInit): Prom
 }
 
 /**
+ * The board plus the contest's current end time and status. The arena polls
+ * this, and a changed end time is how it learns the creator ended the
+ * contest early.
+ */
+export async function fetchLeaderboardState(
+  code: string,
+  headers: HeadersInit,
+): Promise<{ leaderboard: LeaderboardEntry[]; endsAt?: string; status?: Contest['status'] }> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/contests/${encodeURIComponent(code)}/leaderboard`,
+    { headers }
+  );
+  const data = await res.json();
+  if (!data.success) return { leaderboard: [] };
+  return { leaderboard: data.leaderboard, endsAt: data.endsAt, status: data.status };
+}
+
+/** Creator only: ends the contest immediately. */
+export async function endContest(code: string, headers: HeadersInit): Promise<Contest> {
+  const res = await fetch(`${API_BASE_URL}/api/contests/${encodeURIComponent(code)}/end`, {
+    method: 'POST',
+    headers,
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to end contest');
+  return data.contest;
+}
+
+/**
  * Contest submit. The server judges the code and returns the rebuilt
  * leaderboard in the same response, so the score can move without a follow-up
  * request.
@@ -57,6 +86,7 @@ export async function createContest(
     startsAt: string;
     durationMinutes: number;
     isRandom: boolean;
+    isPrivate: boolean;
   },
   headers: HeadersInit
 ): Promise<Contest> {

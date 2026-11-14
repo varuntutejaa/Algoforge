@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/config/api';
-import { fetchContest, fetchLeaderboard, submitContestSolution } from '@/api/contests';
+import { fetchContest, fetchLeaderboardState, submitContestSolution, endContest } from '@/api/contests';
 import { fetchProblem } from '@/api/problems';
+import Avatar from '@/components/ui/Avatar';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import type { Contest, LeaderboardEntry } from '@/types/contest';
 import type { ProblemDetail, Language } from '@/types/problem';
 
@@ -59,9 +61,42 @@ export default function ContestEditor() {
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const lbTimerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const flashRef = useRef<ReturnType<typeof setTimeout>|null>(null);
+  // The 5s poll runs in a closure from the first render, so it reads the
+  // contest through this ref rather than through stale state.
+  const contestRef = useRef<Contest | null>(null);
 
+  const [endedEarly, setEndedEarly] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState('');
+
+  // Besides the board, the poll carries the contest's current end time. If it
+  // moved earlier (the creator ended the contest, or everyone finished),
+  // restart the timer on it so this tab also stops and goes to the results.
   async function loadLeaderboard(code: string) {
-    try { setLeaderboard(await fetchLeaderboard(code, getHeaders())); } catch {}
+    try {
+      const state = await fetchLeaderboardState(code, getHeaders());
+      setLeaderboard(state.leaderboard);
+      const current = contestRef.current;
+      if (current && state.endsAt && new Date(state.endsAt).getTime() < new Date(current.endsAt).getTime()) {
+        const updated = { ...current, endsAt: state.endsAt };
+        contestRef.current = updated;
+        setContest(updated);
+        setEndedEarly(true);
+        startTimer(updated);
+      }
+    } catch {}
+  }
+
+  async function handleEnd() {
+    setEnding(true); setEndError('');
+    try {
+      await endContest(contestCode, getHeaders());
+      navigate(`/contest-results/${contestCode}`);
+    } catch (e: any) {
+      setEndError(e.message || 'Could not end the contest.');
+      setEnding(false);
+    }
   }
 
   function bumpScore() {
@@ -99,7 +134,7 @@ export default function ContestEditor() {
     if (!contestCode) { setError('No contest code provided.'); setLoading(false); return; }
     (async () => {
       try {
-        const c = await fetchContest(contestCode, getHeaders()); setContest(c);
+        const c = await fetchContest(contestCode, getHeaders()); setContest(c); contestRef.current = c;
         const probs = c.problems || []; setProblems(probs);
         if (probs.length) await switchProblem(0, probs, c, language);
         startTimer(c); await loadLeaderboard(c.code);
@@ -181,6 +216,8 @@ export default function ContestEditor() {
   );
   if (!contest) return null;
 
+  const isCreator = !!user?.id && contest.createdBy === user.id;
+
   return (
     <div className="contest-arena" style={{ height: 'calc(100vh - 74px)' }}>
       {/* Top bar */}
@@ -192,7 +229,7 @@ export default function ContestEditor() {
 
         {/* Timer */}
         <div className="arena-timer-block">
-          <span className="arena-timer-label">Time left</span>
+          <span className="arena-timer-label">{endedEarly ? 'Ended early' : 'Time left'}</span>
           <span className={`arena-timer${timerUrgent?' urgent':''}`}>{fmtTimer(timeLeft)}</span>
           <div className="time-progress-wrap">
             <div className={`time-progress-bar${timerUrgent?' urgent':timeProgress < 30?' warn':''}`} style={{ width:`${timeProgress}%` }} />
@@ -200,6 +237,11 @@ export default function ContestEditor() {
         </div>
 
         <div className="topbar-actions">
+          {isCreator && !endedEarly && timeLeft > 0 && (
+            <button onClick={() => { setEndError(''); setConfirmEnd(true); }} className="btn btn-danger-outline arena-btn arena-end-btn">
+              End Contest
+            </button>
+          )}
           <select className="arena-lang-select" value={language} onChange={e => handleLangChange(e.target.value as Language)}>
             <option value="cpp">C++</option>
             <option value="python">Python</option>
@@ -316,6 +358,7 @@ export default function ContestEditor() {
                       >
                         <div className="lb-top-row">
                           <span className={`leaderboard-rank${entry.rank===1?' top-1':entry.rank===2?' top-2':entry.rank===3?' top-3':''}`}>{entry.rank}</span>
+                          <Avatar name={entry.name} src={entry.profilePicture} size={22} />
                           <span className="leaderboard-name">
                             {entry.name}{isSelf && <span className="lb-you">You</span>}
                           </span>
@@ -343,6 +386,18 @@ export default function ContestEditor() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmEnd}
+        title="End this contest now?"
+        message={<>“{contest.title}” will finish immediately for everyone in it. No more submissions will be accepted, and the current standings become the final results. This can’t be undone.</>}
+        confirmLabel="End Contest"
+        danger
+        busy={ending}
+        error={endError}
+        onConfirm={handleEnd}
+        onCancel={() => setConfirmEnd(false)}
+      />
 
       {/* Results modal */}
       {resultsOpen && (

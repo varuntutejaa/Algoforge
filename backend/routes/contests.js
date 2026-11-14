@@ -34,6 +34,20 @@ const contestReadLimiter = rateLimit({
   keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip)
 });
 
+// The join code is the only key to a private contest, and codes are six hex
+// characters. Without a cap, a script could walk the code space through
+// /join and land in private contests.
+const contestJoinLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip),
+  handler: (_req, res) => {
+    res.status(429).json({ success: false, message: "Too many join attempts. Wait a minute and try again." });
+  }
+});
+
 // GET /api/contests - List all contests the user is in or created
 router.get("/", contestReadLimiter, async (req, res) => {
   try {
@@ -62,7 +76,8 @@ router.get("/", contestReadLimiter, async (req, res) => {
 router.get("/available", contestReadLimiter, async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
-    const where = { endsAt: { gt: new Date() } };
+    // Private contests are reachable only by their join code, never listed.
+    const where = { endsAt: { gt: new Date() }, isPrivate: false };
 
     if (userId) {
       where.createdBy = { not: userId };
@@ -133,6 +148,7 @@ function buildLeaderboard(contest) {
         return {
           name: p.name,
           userId: p.userId,
+          profilePicture: p.user?.profilePicture || "",
           score: p.score,
           penalty: p.penalty,
           wrongAttempts: p.wrongAttempts,
@@ -152,25 +168,33 @@ function buildLeaderboard(contest) {
       .map((p, index) => ({ rank: index + 1, ...p }));
 }
 
+// Returns the board together with the contest's current end time and status.
+// The arena polls this every few seconds, so this is how participants learn
+// that the creator ended the contest early.
 async function loadLeaderboard(code) {
   const contest = await prisma.contest.findUnique({
     where: { code },
-    include: { participants: { include: { solves: true } } }
+    include: { participants: { include: { solves: true, user: { select: { profilePicture: true } } } } }
   });
-  return contest ? buildLeaderboard(contest) : null;
+  if (!contest) return null;
+  return {
+    leaderboard: buildLeaderboard(contest),
+    endsAt: contest.endsAt,
+    status: computeStatus(contest, contest.participants)
+  };
 }
 
 // GET /api/contests/:code/leaderboard
 router.get("/:code/leaderboard", requireAuth, contestReadLimiter, async (req, res) => {
   try {
     const code = String(req.params.code || "").toUpperCase();
-    const leaderboard = await loadLeaderboard(code);
+    const board = await loadLeaderboard(code);
 
-    if (!leaderboard) {
+    if (!board) {
       return res.status(404).json({ success: false, message: "Contest not found" });
     }
 
-    res.json({ success: true, leaderboard });
+    res.json({ success: true, leaderboard: board.leaderboard, endsAt: board.endsAt, status: board.status });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to fetch leaderboard" });
@@ -183,7 +207,7 @@ router.post("/create", requireAuth, async (req, res) => {
     const user = await loadRequestUser(req, res);
     if (!user) return;
 
-    const { title, description, problems, startsAt, durationMinutes, isRandom } = req.body;
+    const { title, description, problems, startsAt, durationMinutes, isRandom, isPrivate } = req.body;
 
     if (!title || !startsAt || !durationMinutes || durationMinutes < 1) {
       return res.status(400).json({
@@ -287,6 +311,7 @@ router.post("/create", requireAuth, async (req, res) => {
         startsAt: startsAtDate,
         endsAt: endsAtDate,
         isRandom: !!isRandom,
+        isPrivate: isPrivate === true,
         problems: {
           create: contestProblems.map((p, index) => ({ problemId: p.problemId, title: p.title, position: index }))
         },
@@ -304,8 +329,44 @@ router.post("/create", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/contests/:code/end - The creator ends the contest now
+router.post("/:code/end", requireAuth, async (req, res) => {
+  try {
+    const code = String(req.params.code || "").toUpperCase();
+    const contest = await prisma.contest.findUnique({
+      where: { code },
+      include: { problems: true, participants: true }
+    });
+
+    if (!contest) {
+      return res.status(404).json({ success: false, message: "Contest not found" });
+    }
+    if (contest.createdBy !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Only the person who created this contest can end it" });
+    }
+    if (computeStatus(contest, contest.participants) === "ended") {
+      return res.status(400).json({ success: false, message: "This contest has already ended" });
+    }
+
+    const now = new Date();
+    const updated = await prisma.contest.update({
+      where: { id: contest.id },
+      // Ending a contest that hasn't started also moves its start to now, so
+      // it never reports a start time after its end time.
+      data: { endsAt: now, ...(contest.startsAt > now ? { startsAt: now } : {}) },
+      include: { problems: true, participants: true }
+    });
+
+    console.log(`[contests] POST /:code/end code=${code} ended early by user=${req.user.id}`);
+    res.json({ success: true, contest: formatContest(updated) });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: "Failed to end contest" });
+  }
+});
+
 // POST /api/contests/join - Join a contest by code
-router.post("/join", requireAuth, async (req, res) => {
+router.post("/join", requireAuth, contestJoinLimiter, async (req, res) => {
   try {
     const user = await loadRequestUser(req, res);
     if (!user) return;
@@ -484,8 +545,8 @@ router.post("/:code/submit", requireAuth, contestSubmitLimiter, async (req, res)
     // Send the rebuilt board back with the verdict. The client would otherwise
     // have to issue a second request and wait for it before the score moved,
     // which is what made a solve take a beat to appear.
-    const leaderboard = await loadLeaderboard(code);
-    res.json({ success: true, verdict, results, leaderboard });
+    const board = await loadLeaderboard(code);
+    res.json({ success: true, verdict, results, leaderboard: board ? board.leaderboard : [] });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Failed to record contest submission" });
@@ -508,7 +569,9 @@ function formatContest(contest) {
     code: contest.code,
     title: contest.title,
     description: contest.description || "",
+    createdBy: contest.createdBy,
     createdByName: contest.createdByName,
+    isPrivate: contest.isPrivate,
     problemCount: contest.problems.length,
     participantCount: contest.participants.length,
     startsAt: contest.startsAt,

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/States';
+import Avatar from '@/components/ui/Avatar';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useAuth } from '@/context/AuthContext';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { fetchMyContests, fetchAvailableContests, createContest, joinContest, fetchLeaderboard } from '@/api/contests';
+import { fetchMyContests, fetchAvailableContests, createContest, joinContest, fetchLeaderboard, endContest } from '@/api/contests';
 import { fetchProblems } from '@/api/problems';
 import type { Contest, LeaderboardEntry } from '@/types/contest';
 import type { Problem } from '@/types/problem';
@@ -41,18 +43,33 @@ function localDateTimeInputs(d: Date) {
   };
 }
 
-function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void }) {
-  const { getHeaders } = useAuth();
+function ContestCard({ c, onCopy, onChanged }: { c: Contest; onCopy: (code: string) => void; onChanged: () => void }) {
+  const { user, getHeaders } = useAuth();
+  const { require: requireAuth } = useRequireAuth();
   const status = getStatus(c), countdown = getCountdown(c);
   const [lbOpen, setLbOpen] = useState(false);
   const [lb, setLb] = useState<LeaderboardEntry[]>([]);
   const [lbLoading, setLbLoading] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState('');
+  const isCreator = !!user?.id && c.createdBy === user.id;
 
   async function toggleLb() {
     if (lbOpen) { setLbOpen(false); return; }
+    // The board is per-contest and needs an account; signed out, it would
+    // come back empty and wrongly read as "No participants yet".
+    if (!requireAuth('Sign in to see the leaderboard.')) return;
     setLbLoading(true); setLbOpen(true);
     try { setLb(await fetchLeaderboard(c.code, getHeaders())); } catch {}
     setLbLoading(false);
+  }
+
+  async function handleEnd() {
+    setEnding(true); setEndError('');
+    try { await endContest(c.code, getHeaders()); setConfirmEnd(false); onChanged(); }
+    catch (e: any) { setEndError(e.message || 'Could not end the contest.'); }
+    finally { setEnding(false); }
   }
 
   return (
@@ -63,6 +80,7 @@ function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void
       </div>
       {c.description && <p className="contest-card-desc">{c.description}</p>}
       <div className="contest-card-meta">
+        {c.isPrivate && <span className="contest-private-badge" title="Not listed publicly. People join with the code.">🔒 Private</span>}
         <span>Code: <strong style={{ fontFamily:'monospace' }}>{c.code}</strong></span>
         <span>📝 {c.problemCount} problems</span>
         <span>👥 {c.participantCount} participants</span>
@@ -71,11 +89,35 @@ function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void
         {countdown && <span className={`countdown${status === 'active' ? ' urgent' : ''}`}>⏱ {countdown}</span>}
       </div>
       <div className="contest-card-actions">
-        {status === 'active' && <Link to={`/contest-editor/${c.code}`} className="btn btn-primary">Enter Contest</Link>}
-        {status === 'ended' && <Link to={`/contest-results/${c.code}`} className="btn btn-secondary">View Results</Link>}
+        {status === 'active' && (
+          <Link to={`/contest-editor/${c.code}`} className="btn btn-primary"
+            onClick={e => { if (!requireAuth('Sign in to enter the contest.')) e.preventDefault(); }}>Enter Contest</Link>
+        )}
+        {status === 'ended' && (
+          <Link to={`/contest-results/${c.code}`} className="btn btn-secondary"
+            onClick={e => { if (!requireAuth('Sign in to view the results.')) e.preventDefault(); }}>View Results</Link>
+        )}
         <button onClick={() => onCopy(c.code)} className="btn btn-secondary">Copy Code</button>
         <button onClick={toggleLb} className="btn btn-secondary">{lbOpen ? 'Hide Leaderboard' : 'Leaderboard'}</button>
+        {isCreator && status !== 'ended' && (
+          <button onClick={() => { setEndError(''); setConfirmEnd(true); }} className="btn btn-danger-outline contest-end-btn">
+            End Contest
+          </button>
+        )}
       </div>
+      <ConfirmDialog
+        open={confirmEnd}
+        title={status === 'upcoming' ? 'End this contest before it starts?' : 'End this contest now?'}
+        message={status === 'upcoming'
+          ? <>“{c.title}” will be closed and nobody will be able to take part. This can’t be undone.</>
+          : <>“{c.title}” will finish immediately for all {c.participantCount} participant{c.participantCount === 1 ? '' : 's'}. No more submissions will be accepted, and the current standings become the final results. This can’t be undone.</>}
+        confirmLabel="End Contest"
+        danger
+        busy={ending}
+        error={endError}
+        onConfirm={handleEnd}
+        onCancel={() => setConfirmEnd(false)}
+      />
       {lbOpen && (
         <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           {lbLoading ? <p className="loading-text">Loading…</p>
@@ -83,6 +125,7 @@ function ContestCard({ c, onCopy }: { c: Contest; onCopy: (code: string) => void
            : lb.map(e => (
             <div key={e.rank} style={{ display:'flex', alignItems:'center', gap:12, fontSize:14 }}>
               <span style={{ width:24, fontWeight:800, color:'#64748b' }}>{e.rank}</span>
+              <Avatar name={e.name} src={e.profilePicture} size={24} />
               <span style={{ flex:1, color:'#e2e8f0', fontWeight:600 }}>{e.name}</span>
               <span style={{ fontSize:12, color:'#64748b' }}>{(e.solvedProblems||[]).length} solved · {fmtDur(e.timeTakenSeconds)}</span>
               <span style={{ fontWeight:800, color:'#f8fafc' }}>{e.score}</span>
@@ -106,6 +149,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   const today = localDateTimeInputs(new Date()).date;
   const [startDate, setStartDate] = useState(() => localDateTimeInputs(new Date(Date.now() + 60_000)).date);
   const [startTime, setStartTime] = useState(() => localDateTimeInputs(new Date(Date.now() + 60_000)).time);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -133,8 +177,11 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
     if (mode === 'choose' && selected.size === 0) { setMsg('Select at least one problem'); return; }
     setSubmitting(true); setMsg('');
     try {
-      const c = await createContest({ title: title.trim(), description: desc.trim(), problems: mode === 'random' ? { count: randomCount } : Array.from(selected), startsAt: sa.toISOString(), durationMinutes: duration, isRandom: mode === 'random' }, getHeaders());
-      setMsg(`✓ Created! Code: ${c.code}`); setTitle(''); setDesc(''); setSelected(new Set()); onCreated();
+      const c = await createContest({ title: title.trim(), description: desc.trim(), problems: mode === 'random' ? { count: randomCount } : Array.from(selected), startsAt: sa.toISOString(), durationMinutes: duration, isRandom: mode === 'random', isPrivate }, getHeaders());
+      setMsg(c.isPrivate
+        ? `✓ Created a private contest. Share the code ${c.code} with the people you want in.`
+        : `✓ Created! Code: ${c.code}`);
+      setTitle(''); setDesc(''); setSelected(new Set()); onCreated();
     } catch (e: any) { setMsg(e.message); }
     finally { setSubmitting(false); }
   }
@@ -163,6 +210,24 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           <label>Duration (min)</label>
           <input type="number" value={duration} min={5} max={480} onChange={e=>setDuration(+e.target.value)} />
         </div>
+      </div>
+      <div className="form-group">
+        <label id="visibility-label">Visibility</label>
+        <div className="visibility-toggle" role="radiogroup" aria-labelledby="visibility-label">
+          <button type="button" role="radio" aria-checked={!isPrivate}
+            className={`visibility-option${!isPrivate ? ' active' : ''}`} onClick={() => setIsPrivate(false)}>
+            🌐 Public
+          </button>
+          <button type="button" role="radio" aria-checked={isPrivate}
+            className={`visibility-option${isPrivate ? ' active' : ''}`} onClick={() => setIsPrivate(true)}>
+            🔒 Private
+          </button>
+        </div>
+        <p className="visibility-hint">
+          {isPrivate
+            ? 'Hidden from the Available list. Only people you give the join code to can get in.'
+            : 'Listed under Available, so anyone signed in can find and join it.'}
+        </p>
       </div>
       <div className="form-group">
         <label>Problem Mode</label>
@@ -244,7 +309,10 @@ type Tab = 'my' | 'create' | 'join';
 export default function Contests() {
   const { getHeaders } = useAuth();
   const { signedIn, require: requireAuth } = useRequireAuth();
-  const [tab, setTab] = useState<Tab>('my');
+  // Signed-out visitors land on the tab that lists public contests; "My
+  // Contests" has nothing to show them. A restored session sets the user on
+  // the first render, so a returning user still starts on "My Contests".
+  const [tab, setTab] = useState<Tab>(() => (signedIn ? 'my' : 'join'));
   const [myC, setMyC] = useState<Contest[]>([]);
   const [avail, setAvail] = useState<Contest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -255,12 +323,18 @@ export default function Contests() {
   const interval = useRef<ReturnType<typeof setInterval>|null>(null);
 
   const load = useCallback(async () => {
-    // Both endpoints are per-account. A signed-out visitor can still read the
-    // page and use Join/Create, which prompt for sign-in at the point of use.
-    if (!signedIn) { setMyC([]); setAvail([]); setLoadError(''); setLoading(false); return; }
     try {
-      const [my, av] = await Promise.all([fetchMyContests(getHeaders()), fetchAvailableContests(getHeaders())]);
-      setMyC(my); setAvail(av); setLoadError('');
+      // Public contests are listed for everyone (private ones never are).
+      // "My contests" is per-account, so a signed-out visitor gets only the
+      // public list; joining and entering prompt for sign-in at that point.
+      if (!signedIn) {
+        setMyC([]);
+        setAvail(await fetchAvailableContests({}));
+      } else {
+        const [my, av] = await Promise.all([fetchMyContests(getHeaders()), fetchAvailableContests(getHeaders())]);
+        setMyC(my); setAvail(av);
+      }
+      setLoadError('');
     } catch (e: any) {
       setLoadError(e?.message || 'Failed to load contests');
     } finally { setLoading(false); }
@@ -268,10 +342,9 @@ export default function Contests() {
 
   useEffect(() => {
     load();
-    if (!signedIn) return;
     interval.current = setInterval(load, 30000);
     return () => { if (interval.current) clearInterval(interval.current); };
-  }, [load, signedIn]);
+  }, [load]);
 
   function filter(list: Contest[]) {
     return list.filter(c => {
@@ -334,7 +407,16 @@ export default function Contests() {
       )}
 
       {/* My Contests */}
-      {tab==='my' && (
+      {tab==='my' && !signedIn && (
+        <div className="contest-panel active">
+          <EmptyState
+            title="Sign in to see your contests"
+            hint="Contests you create or join show up here. Public contests are listed under Join."
+            action={<Link to="/login" state={{ from: '/contests' }} className="af-retry-btn">Sign in</Link>}
+          />
+        </div>
+      )}
+      {tab==='my' && signedIn && (
         <div className="contest-panel active">
           {loading && <CardSkeleton count={3} />}
           {!loading && loadError && <ErrorState message={loadError} onRetry={() => { setLoading(true); load(); }} />}
@@ -346,7 +428,7 @@ export default function Contests() {
                 : 'Try a different search term or status filter.'}
             />
           )}
-          {fMy.map(c => <ContestCard key={c.code} c={c} onCopy={copy} />)}
+          {fMy.map(c => <ContestCard key={c.code} c={c} onCopy={copy} onChanged={load} />)}
         </div>
       )}
 
@@ -368,7 +450,7 @@ export default function Contests() {
             </button>
           </div>
           {joinMsg && <p style={{ fontSize:14, color: joinMsg.startsWith('✓')?'#22c55e':'#f87171', marginBottom:16 }}>{joinMsg}</p>}
-          <h3 style={{ fontSize:14, fontWeight:700, color:'#94a3b8', marginBottom:12 }}>Available Contests</h3>
+          <h3 style={{ fontSize:14, fontWeight:700, color:'#94a3b8', marginBottom:12 }}>{signedIn ? 'Available Contests' : 'Public Contests'}</h3>
           {loading && <CardSkeleton count={2} />}
           {!loading && loadError && <ErrorState message={loadError} onRetry={() => { setLoading(true); load(); }} />}
           {!loading && !loadError && fAv.length === 0 && (
@@ -377,7 +459,7 @@ export default function Contests() {
               hint="Have a code? Enter it above to join directly."
             />
           )}
-          {fAv.map(c => <ContestCard key={c.code} c={c} onCopy={copy} />)}
+          {fAv.map(c => <ContestCard key={c.code} c={c} onCopy={copy} onChanged={load} />)}
         </div>
       )}
     </div>

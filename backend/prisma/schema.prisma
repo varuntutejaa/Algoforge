@@ -126,6 +126,9 @@ model Contest {
   startsAt      DateTime @map("starts_at")
   endsAt        DateTime @map("ends_at")
   isRandom      Boolean  @default(false) @map("is_random")
+  // Private contests are left out of the public "available" list; the only
+  // way in is the join code.
+  isPrivate     Boolean  @default(false) @map("is_private")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

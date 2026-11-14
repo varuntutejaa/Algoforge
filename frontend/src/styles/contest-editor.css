@@ -1066,3 +1066,6 @@ body {
   font-weight: 600;
   color: #4ade80;
 }
+
+/* Creator-only; set apart from Run and Submit so it isn't hit by accident. */
+.topbar-actions .arena-end-btn { margin-right: 6px; }

@@ -270,11 +270,27 @@ button { font: inherit; cursor: pointer; }
 .td-name {
   font-weight: 600;
   color: #f1f5f9;
-  max-width: 160px;
+  max-width: 200px;
+}
+
+/* Avatar, name and the "You" badge on one line; only the name truncates. */
+.td-name-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.td-name-text {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.td-name-inner .me-badge { margin-left: 0; flex-shrink: 0; }
+
+.podium-avatar { display: flex; justify-content: center; margin-bottom: 8px; }
 
 .me-badge {
   display: inline-block;

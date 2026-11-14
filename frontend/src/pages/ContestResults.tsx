@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { fetchContest, fetchLeaderboard } from '@/api/contests';
+import Avatar from '@/components/ui/Avatar';
 import type { Contest, LeaderboardEntry } from '@/types/contest';
 
 function fmtTime(sec: number | null) {
@@ -100,6 +101,7 @@ export default function ContestResults() {
                 {entry ? (
                   <div className="podium-card">
                     <div className="podium-medal">{medals[i]}</div>
+                    <div className="podium-avatar"><Avatar name={entry.name} src={entry.profilePicture} size={44} /></div>
                     <div className="podium-name">{entry.name}</div>
                     <div className="podium-score">{entry.score > 0 ? `+${entry.score}` : entry.score}</div>
                     <div className="podium-solved">{(entry.solvedProblems||[]).length}/{problems.length} solved</div>
@@ -143,8 +145,11 @@ export default function ContestResults() {
                     <tr key={entry.rank} className={isMe ? 'is-me' : ''}>
                       <td className={`td-rank${entry.rank===1?' r1':entry.rank===2?' r2':entry.rank===3?' r3':''}`}>{entry.rank}</td>
                       <td className="td-name">
-                        {entry.name}
-                        {isMe && <span className="me-badge">You</span>}
+                        <span className="td-name-inner">
+                          <Avatar name={entry.name} src={entry.profilePicture} size={24} />
+                          <span className="td-name-text">{entry.name}</span>
+                          {isMe && <span className="me-badge">You</span>}
+                        </span>
                       </td>
                       {problems.map((p, i) => (
                         <td key={i} className="td-prob center">
