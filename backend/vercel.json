@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then npx prisma migrate deploy; else echo 'Skipping migrations outside production'; fi",
+  "buildCommand": "sh scripts/migrate-on-deploy.sh",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ],
