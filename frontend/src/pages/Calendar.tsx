@@ -45,6 +45,7 @@ function buildGcalUrl(c: CalContest) {
 }
 
 const LOGO_URLS: Partial<Record<Platform,string>> = {
+  algoforge: '/assets/algoforge_favicon_themed.svg',
   codeforces: 'https://codeforces.com/favicon-32x32.png',
   leetcode: 'https://leetcode.com/favicon-192x192.png',
   codechef: 'https://www.codechef.com/favicon.ico',
@@ -53,7 +54,7 @@ const LOGO_URLS: Partial<Record<Platform,string>> = {
 };
 function PlatformLogo({ source }: { source: Platform }) {
   const src = LOGO_URLS[source]; if (!src) return null;
-  return <img src={src} className="cf-logo-icon" alt={source} onError={e=>{(e.target as HTMLImageElement).style.display='none';}} />;
+  return <img src={src} className="cf-logo-icon" alt={platformLabel(source)} onError={e=>{(e.target as HTMLImageElement).style.display='none';}} />;
 }
 
 // Layout engine for day view events
@@ -376,8 +377,8 @@ export default function Calendar() {
             const chipCls=['event-chip', pc, st==='active'?'active':st==='ended'?'ended':''].filter(Boolean).join(' ');
             return (
               <div key={c.code} data-chip="1" className={chipCls} onClick={e=>{e.stopPropagation();setSelectedContest(c);}}>
-                <span className="event-chip-dot" />
                 <span className="event-chip-time">{fmtTime(c.startsAt)}</span>
+                <PlatformLogo source={c.source} />
                 <span className="event-chip-label">{c.title}</span>
               </div>
             );
@@ -437,7 +438,7 @@ export default function Calendar() {
                       <div key={c.code} className={evCls}
                         style={{top:(sm/60)*60, height:Math.max(28,(dm/60)*60)}}
                         onClick={()=>setSelectedContest(c)}>
-                        <div className="week-event-title">{c.title}</div>
+                        <div className="week-event-title"><PlatformLogo source={c.source} /> {c.title}</div>
                         <div className="week-event-time">{fmtTime(c.startsAt)}</div>
                       </div>
                     );

@@ -1429,7 +1429,11 @@ body {
 }
 
 /* ---- CF Logo icon ---- */
+/* Tailwind's preflight makes every <img> display:block, which put the logo on
+   its own line above the title wherever it sits in running text (week events,
+   the Upcoming list). Inside flex rows this has no effect. */
 .cf-logo-icon {
+  display: inline-block;
   width: 14px;
   height: 14px;
   border-radius: 2px;
