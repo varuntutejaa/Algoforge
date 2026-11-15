@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import OnboardingGate from './components/ui/OnboardingGate';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/ui/ProtectedRoute';
@@ -15,8 +16,18 @@ import ContestResults from './pages/ContestResults';
 import Dashboard from './pages/Dashboard';
 import Submissions from './pages/Submissions';
 import Settings from './pages/Settings';
+import GithubSync from './pages/GithubSync';
+import Welcome from './pages/Welcome';
 
 const FULLSCREEN_ROUTES = ['/editor/', '/contest-editor'];
+
+/** GitHub moved out of Settings; old links and OAuth results keep working. */
+function SettingsRoute() {
+  const { search } = useLocation();
+  return new URLSearchParams(search).has('github')
+    ? <Navigate to={`/github${search}`} replace />
+    : <Settings />;
+}
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
@@ -26,6 +37,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const showFooter = pathname === '/';
   return (
     <>
+      <OnboardingGate />
       {!isFullscreen && <Navbar />}
       {children}
       {showFooter && <Footer />}
@@ -57,7 +69,9 @@ export default function App() {
             <Route path="/contest-results/:code" element={<ContestResults />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/submissions" element={<Submissions />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<SettingsRoute />} />
+            <Route path="/github" element={<GithubSync />} />
+            <Route path="/welcome" element={<Welcome />} />
           </Route>
 
           {/* Fallback */}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
+import { usePreferences, useResolvedTheme, getPreferences } from '@/lib/preferences';
 import { API_BASE_URL } from '@/config/api';
 import { fetchContest, fetchLeaderboardState, submitContestSolution, endContest } from '@/api/contests';
 import { fetchProblem } from '@/api/problems';
@@ -35,7 +36,9 @@ export default function ContestEditor() {
   const [problemDetail, setProblemDetail] = useState<ProblemDetail | null>(null);
   const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
 
-  const [language, setLanguage] = useState<Language>('cpp');
+  const [language, setLanguage] = useState<Language>(() => getPreferences().defaultLanguage);
+  const prefs = usePreferences();
+  const resolvedTheme = useResolvedTheme();
   const [code, setCode] = useState('');
   const monacoRef = useRef<any>(null);
 
@@ -325,9 +328,9 @@ export default function ContestEditor() {
             <MonacoEditor
               height="100%"
               language={MONACO_LANG[language]}
-              theme="vs-dark"
+              theme={resolvedTheme === 'light' ? 'light' : 'vs-dark'}
               value={code}
-              options={{ fontFamily:"'DM Mono', monospace", fontSize:14, lineHeight:24, minimap:{enabled:false}, scrollBeyondLastLine:false, tabSize:2, insertSpaces:true, padding:{top:12,bottom:12}, automaticLayout:true }}
+              options={{ fontFamily:"'DM Mono', monospace", fontSize:prefs.editorFontSize, lineHeight:Math.round(prefs.editorFontSize*1.7), minimap:{enabled:false}, scrollBeyondLastLine:false, tabSize:prefs.editorTabSize, insertSpaces:true, padding:{top:12,bottom:12}, automaticLayout:true }}
               onMount={editor => { monacoRef.current = editor; }}
               onChange={val => {
                 if (!problemDetail) return;

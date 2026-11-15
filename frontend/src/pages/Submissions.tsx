@@ -57,19 +57,19 @@ export default function Submissions() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} style={{ textAlign:'center', color:'#64748b', padding:'32px 16px' }}>Loading submissions…</td></tr>}
-            {error && <tr><td colSpan={6} style={{ textAlign:'center', color:'#f87171', padding:'32px 16px' }}>{error}</td></tr>}
+            {loading && <tr><td colSpan={6} style={{ textAlign:'center', color:'var(--t-64748b)', padding:'32px 16px' }}>Loading submissions…</td></tr>}
+            {error && <tr><td colSpan={6} style={{ textAlign:'center', color:'var(--t-f87171)', padding:'32px 16px' }}>{error}</td></tr>}
             {!loading && !error && subs.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign:'center', color:'#64748b', padding:'32px 16px' }}>No submissions found.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign:'center', color:'var(--t-64748b)', padding:'32px 16px' }}>No submissions found.</td></tr>
             )}
             {!loading && !error && subs.map((s, i) => (
               <tr key={i}>
                 <td>{s.problemTitle}</td>
                 <td style={{ fontFamily:"'DM Mono', monospace", fontSize:13 }}>{s.language}</td>
                 <td><span className={verdictCls(s.verdict)}>{s.verdict}</span></td>
-                <td style={{ color:'#94a3b8', fontSize:13 }}>{s.runtime != null ? `${s.runtime}s` : '–'}</td>
-                <td style={{ color:'#94a3b8', fontSize:13 }}>{s.memory != null ? `${s.memory} KB` : '–'}</td>
-                <td style={{ color:'#94a3b8', fontSize:13 }}>{fmt(s.submittedAt)}</td>
+                <td style={{ color:'var(--t-94a3b8)', fontSize:13 }}>{s.runtime != null ? `${s.runtime}s` : '–'}</td>
+                <td style={{ color:'var(--t-94a3b8)', fontSize:13 }}>{s.memory != null ? `${s.memory} KB` : '–'}</td>
+                <td style={{ color:'var(--t-94a3b8)', fontSize:13 }}>{fmt(s.submittedAt)}</td>
               </tr>
             ))}
           </tbody>

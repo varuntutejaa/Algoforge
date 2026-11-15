@@ -19,6 +19,12 @@ model User {
   authId              String    @unique @map("auth_id")
   email               String
   name                String    @default("")
+  // Chosen on the welcome step after signup. Null until then, which is how
+  // the app knows to send someone there. Usernames are stored lowercase, so
+  // the unique index alone guarantees no two people share one in any casing.
+  firstName           String?   @map("first_name")
+  lastName            String?   @map("last_name")
+  username            String?   @unique
   profilePicture      String    @default("") @map("profile_picture")
   rating              Int       @default(1200)
   totalSubmissions    Int       @default(0) @map("total_submissions")

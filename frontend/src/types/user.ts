@@ -4,6 +4,10 @@ export interface AlgoforgeUser {
   name: string;
   email: string;
   photoURL: string;
+  firstName: string;
+  lastName: string;
+  /** Empty until the welcome step after signup is done. */
+  username: string;
 }
 
 export interface ProfileStats {

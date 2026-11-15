@@ -89,7 +89,7 @@ export default function Dashboard() {
   }, [user, getHeaders]);
 
   if (loading) return <p className="loading-text" style={{ textAlign:'center', padding:'80px 0' }}>Loading dashboard…</p>;
-  if (error) return <p style={{ color:'#f87171', textAlign:'center', padding:'80px 0', fontSize:14 }}>{error}</p>;
+  if (error) return <p style={{ color:'var(--t-f87171)', textAlign:'center', padding:'80px 0', fontSize:14 }}>{error}</p>;
   if (!profile) return null;
 
   const difficultyCounts: Record<string, number> = { Easy: 0, Medium: 0, Hard: 0 };
@@ -174,7 +174,7 @@ export default function Dashboard() {
                     <span className="check">✓</span>
                     <span>{item.title}</span>
                   </div>
-                  <span style={{ fontSize:13, color:'#64748b' }}>{fmt(item.solvedAt)}</span>
+                  <span style={{ fontSize:13, color:'var(--t-64748b)' }}>{fmt(item.solvedAt)}</span>
                 </div>
               ))}
             </div>
@@ -196,7 +196,7 @@ export default function Dashboard() {
                       {item.tags?.slice(0, 3).map(t => <span key={t}>{t}</span>)}
                     </div>
                   </div>
-                  <span style={{ fontSize:13, color:'#64748b', flexShrink:0 }}>{fmt(item.solvedAt)}</span>
+                  <span style={{ fontSize:13, color:'var(--t-64748b)', flexShrink:0 }}>{fmt(item.solvedAt)}</span>
                 </div>
               ))}
             </div>

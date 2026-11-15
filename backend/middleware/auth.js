@@ -76,11 +76,19 @@ async function findOrCreateUser(payload) {
   // Guarded so a token without the claim never blanks an existing picture.
   const picture = payload.picture || "";
 
-  return prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { authId },
-    update: { email, ...(name ? { name } : {}), ...(picture ? { profilePicture: picture } : {}) },
+    update: { email, ...(picture ? { profilePicture: picture } : {}) },
     create: { authId, email, name, profilePicture: picture },
   });
+
+  // Until someone picks their own name on the welcome step, follow the one
+  // their sign-in provider reports. After that their choice wins: writing the
+  // token's name on every request would undo it on the very next call.
+  if (!user.username && name && user.name !== name) {
+    return prisma.user.update({ where: { id: user.id }, data: { name } });
+  }
+  return user;
 }
 
 /**

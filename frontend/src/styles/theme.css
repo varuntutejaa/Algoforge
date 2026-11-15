@@ -1,0 +1,19 @@
+/* Light-theme adjustments that a one-for-one color swap can't express. The
+   per-color counterparts live in theme-tokens.css. */
+
+:root[data-theme="light"] {
+  --af-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* Dark scrims and heavy drop shadows read as smudges on a light page. */
+:root[data-theme="light"] .af-dialog-backdrop { background: rgba(15, 23, 42, 0.35); }
+:root[data-theme="light"] .profile-dropdown { box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12); }
+
+/* DiffBadge uses Tailwind shades picked for a dark page. */
+:root[data-theme="light"] .diff-easy { color: #15803d; background: rgba(22, 163, 74, 0.1); }
+:root[data-theme="light"] .diff-medium { color: #a16207; background: rgba(202, 138, 4, 0.12); }
+:root[data-theme="light"] .diff-hard { color: #b91c1c; background: rgba(220, 38, 38, 0.1); }
+
+/* Cards sit on a tinted page, so in light mode they're plain white. */
+:root[data-theme="light"] .settings-card,
+:root[data-theme="light"] .form-card { background: #ffffff; }

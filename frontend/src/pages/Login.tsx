@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import AuthLayout from '@/components/auth/AuthLayout';
 import { IconEye, IconEyeOff } from '@/components/ui/Icons';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,8 +46,9 @@ export default function Login() {
       });
       if (!res.success) { toast.error(res.message || 'Sign-in failed'); return; }
       login(res.user, idToken);
+      const next = res.user.username ? redirectTo : '/welcome';
       toast.success('Welcome!');
-      setTimeout(() => navigate(redirectTo), 600);
+      setTimeout(() => navigate(next, { state: { from: redirectTo } }), 600);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
@@ -62,22 +64,18 @@ export default function Login() {
       const res = await backendAuth('login', idToken);
       if (!res.success) { toast.error(res.message || 'Login failed'); return; }
       login(res.user, idToken);
+      const next = res.user.username ? redirectTo : '/welcome';
       toast.success('Welcome back!');
-      setTimeout(() => navigate(redirectTo), 800);
+      setTimeout(() => navigate(next, { state: { from: redirectTo } }), 800);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
   }
 
   return (
-    <main className="page auth-page">
-      <section className="form-panel">
+    <AuthLayout>
         <div className="form-card">
           <div className="form-header">
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 20, textDecoration: 'none' }}>
-              <img src="/assets/algoforge_favicon_themed.svg" alt="AlgoForge" style={{ width: 32, height: 32 }} />
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
-            </Link>
             <h2 className="form-title">Sign in</h2>
             <p className="form-sub">Welcome back to AlgoForge.</p>
           </div>
@@ -130,7 +128,6 @@ export default function Login() {
             New to AlgoForge? <Link to="/signup" className="signup-link">Create account</Link>
           </p>
         </div>
-      </section>
-    </main>
+    </AuthLayout>
   );
 }

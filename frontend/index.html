@@ -8,6 +8,22 @@
     <link rel="icon" href="/assets/algoforge_favicon_themed.svg" type="image/svg+xml" />
     <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <script>
+      // Applies the saved theme before the first paint, so a light-mode visitor
+      // never sees a flash of the dark page. Mirrors applyTheme() in
+      // src/lib/preferences.ts, which takes over once the app loads.
+      (function () {
+        var theme = 'dark';
+        try {
+          var choice = (JSON.parse(localStorage.getItem('algoforge-prefs') || '{}') || {}).theme;
+          if (choice === 'light') theme = 'light';
+          else if (choice === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches) theme = 'light';
+        } catch (e) {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        if (theme === 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f6f7f9');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

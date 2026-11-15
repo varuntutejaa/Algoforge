@@ -8,11 +8,11 @@
 
 body{
   min-height: 100vh;
-  color: #f8fafc;
+  color: var(--t-f8fafc);
   font-family: 'Inter', sans-serif;
   background:
     radial-gradient(circle at top left, rgba(37,99,235,0.18), transparent 28%),
-    #050505;
+    var(--t-050505);
 }
 
 .dashboard-page{
@@ -28,7 +28,7 @@ body{
 .section-kicker{
   display: inline-block;
   margin-bottom: 10px;
-  color: #93c5fd;
+  color: var(--t-93c5fd);
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
@@ -41,7 +41,7 @@ body{
 
 .dashboard-header p,
 .loading-text{
-  color: #cbd5e1;
+  color: var(--t-cbd5e1);
 }
 
 .profile-card{
@@ -50,9 +50,9 @@ body{
   gap: 18px;
   padding: 24px;
   margin-bottom: 24px;
-  border: 1px solid rgba(255,255,255,0.09);
+  border: 1px solid rgba(var(--t-ink), 0.09);
   border-radius: 16px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(var(--t-ink), 0.03);
 }
 
 .profile-identity h2{
@@ -61,19 +61,19 @@ body{
 }
 
 .profile-identity p{
-  color: #94a3b8;
+  color: var(--t-94a3b8);
 }
 
 .profile-stat{
   padding: 14px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(var(--t-ink), 0.04);
+  border: 1px solid rgba(var(--t-ink), 0.06);
 }
 
 .profile-stat span{
   display: block;
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 8px;
@@ -93,13 +93,13 @@ body{
 .stat-card{
   padding: 20px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: #0d1117;
+  border: 1px solid rgba(var(--t-ink), 0.08);
+  background: var(--t-0d1117);
 }
 
 .stat-card span{
   display: block;
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 10px;
@@ -119,8 +119,8 @@ body{
 .panel{
   padding: 22px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: #0d1117;
+  border: 1px solid rgba(var(--t-ink), 0.08);
+  background: var(--t-0d1117);
   margin-bottom: 24px;
 }
 
@@ -138,7 +138,7 @@ body{
 }
 
 .panel-heading p{
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 13px;
 }
 
@@ -155,7 +155,7 @@ body{
 }
 
 .breakdown-item span{
-  color: #cbd5e1;
+  color: var(--t-cbd5e1);
   font-size: 14px;
   font-weight: 700;
 }
@@ -163,14 +163,14 @@ body{
 .breakdown-bar{
   height: 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(var(--t-ink), 0.08);
   overflow: hidden;
 }
 
 .breakdown-bar div{
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+  background: linear-gradient(90deg, var(--t-60a5fa), var(--t-93c5fd));
 }
 
 .breakdown-item strong{
@@ -200,7 +200,7 @@ body{
 .hm-month-label{
   height: 16px;
   font-size: 11px;
-  color: #64748b;
+  color: var(--t-64748b);
   font-weight: 600;
   white-space: nowrap;
   font-family: 'DM Mono', monospace;
@@ -211,7 +211,7 @@ body{
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(var(--t-ink), 0.06);
   flex-shrink: 0;
 }
 
@@ -239,12 +239,12 @@ body{
   gap: 12px;
   padding: 14px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.07);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(var(--t-ink), 0.07);
+  background: rgba(var(--t-ink), 0.03);
 }
 
 .activity-item .check{
-  color: #86efac;
+  color: var(--t-86efac);
   font-weight: 800;
 }
 
@@ -259,18 +259,18 @@ body{
 .difficulty-badge{
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #cbd5e1;
+  border: 1px solid rgba(var(--t-ink), 0.1);
+  color: var(--t-cbd5e1);
   font-size: 12px;
   font-weight: 700;
 }
 
-.difficulty-badge.easy{ color: #86efac; border-color: rgba(134,239,172,0.3); }
-.difficulty-badge.medium{ color: #fde68a; border-color: rgba(253,230,138,0.3); }
-.difficulty-badge.hard{ color: #fca5a5; border-color: rgba(252,165,165,0.3); }
+.difficulty-badge.easy{ color: var(--t-86efac); border-color: rgba(134,239,172,0.3); }
+.difficulty-badge.medium{ color: var(--t-fde68a); border-color: rgba(253,230,138,0.3); }
+.difficulty-badge.hard{ color: var(--t-fca5a5); border-color: rgba(252,165,165,0.3); }
 
 .empty-state{
-  color: #94a3b8;
+  color: var(--t-94a3b8);
 }
 
 @media (max-width: 900px){

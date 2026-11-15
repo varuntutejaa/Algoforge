@@ -4,6 +4,7 @@ const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { prisma } = require('../config/prismaClient');
+const { publicUser } = require('../utils/userProfile');
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -33,17 +34,12 @@ router.post('/check-email', emailCheckLimiter, async (req, res) => {
 
 router.post('/login', authLimiter, requireAuth, async (req, res) => {
     const user = req.user;
+    // username is empty until the welcome step is done; the client uses that
+    // to send the person there.
     res.json({
         success: true,
         message: "Login successful",
-        user: {
-            id: user.id,
-            authId: user.authId,
-            name: user.name,
-            email: user.email,
-            profilePicture: user.profilePicture,
-            rating: user.rating
-        }
+        user: publicUser(user)
     });
 });
 
@@ -52,13 +48,7 @@ router.post('/signup', authLimiter, requireAuth, async (req, res) => {
     res.json({
         success: true,
         message: "Signup successful",
-        user: {
-            id: user.id,
-            authId: user.authId,
-            name: user.name,
-            email: user.email,
-            profilePicture: user.profilePicture
-        }
+        user: publicUser(user)
     });
 });
 

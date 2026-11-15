@@ -1,7 +1,9 @@
+// The light theme swaps in deeper text shades (see globals.css); the
+// 300/400 shades are tuned for the dark background.
 const map: Record<string, string> = {
-  easy:   'text-green-300 bg-green-400/10',
-  medium: 'text-yellow-300 bg-yellow-400/10',
-  hard:   'text-red-400 bg-red-400/10',
+  easy:   'diff-easy text-green-300 bg-green-400/10',
+  medium: 'diff-medium text-yellow-300 bg-yellow-400/10',
+  hard:   'diff-hard text-red-400 bg-red-400/10',
 };
 
 export default function DiffBadge({ difficulty }: { difficulty: string }) {

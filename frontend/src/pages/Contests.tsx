@@ -124,11 +124,11 @@ function ContestCard({ c, onCopy, onChanged }: { c: Contest; onCopy: (code: stri
            : lb.length === 0 ? <p className="empty-state">No participants yet.</p>
            : lb.map(e => (
             <div key={e.rank} style={{ display:'flex', alignItems:'center', gap:12, fontSize:14 }}>
-              <span style={{ width:24, fontWeight:800, color:'#64748b' }}>{e.rank}</span>
+              <span style={{ width:24, fontWeight:800, color:'var(--t-64748b)' }}>{e.rank}</span>
               <Avatar name={e.name} src={e.profilePicture} size={24} />
-              <span style={{ flex:1, color:'#e2e8f0', fontWeight:600 }}>{e.name}</span>
-              <span style={{ fontSize:12, color:'#64748b' }}>{(e.solvedProblems||[]).length} solved · {fmtDur(e.timeTakenSeconds)}</span>
-              <span style={{ fontWeight:800, color:'#f8fafc' }}>{e.score}</span>
+              <span style={{ flex:1, color:'var(--t-e2e8f0)', fontWeight:600 }}>{e.name}</span>
+              <span style={{ fontSize:12, color:'var(--t-64748b)' }}>{(e.solvedProblems||[]).length} solved · {fmtDur(e.timeTakenSeconds)}</span>
+              <span style={{ fontWeight:800, color:'var(--t-f8fafc)' }}>{e.score}</span>
             </div>
           ))}
         </div>
@@ -449,8 +449,8 @@ export default function Contests() {
               {joining?'Joining…':'Join'}
             </button>
           </div>
-          {joinMsg && <p style={{ fontSize:14, color: joinMsg.startsWith('✓')?'#22c55e':'#f87171', marginBottom:16 }}>{joinMsg}</p>}
-          <h3 style={{ fontSize:14, fontWeight:700, color:'#94a3b8', marginBottom:12 }}>{signedIn ? 'Available Contests' : 'Public Contests'}</h3>
+          {joinMsg && <p style={{ fontSize:14, color: joinMsg.startsWith('✓')?'var(--t-22c55e)':'var(--t-f87171)', marginBottom:16 }}>{joinMsg}</p>}
+          <h3 style={{ fontSize:14, fontWeight:700, color:'var(--t-94a3b8)', marginBottom:12 }}>{signedIn ? 'Available Contests' : 'Public Contests'}</h3>
           {loading && <CardSkeleton count={2} />}
           {!loading && loadError && <ErrorState message={loadError} onRetry={() => { setLoading(true); load(); }} />}
           {!loading && !loadError && fAv.length === 0 && (

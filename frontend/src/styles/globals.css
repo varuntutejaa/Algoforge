@@ -5,6 +5,10 @@
 /* Tailwind (kept for DiffBadge utility classes) */
 @import "tailwindcss";
 
+/* Theme tokens first: every stylesheet below reads them. */
+@import "./theme-tokens.css";
+@import "./theme.css";
+
 /* ── Original component CSS files ── */
 @import "./nav.css";
 @import "./auth.css";
@@ -17,6 +21,8 @@
 @import "./contest-editor.css";
 @import "./contest-results.css";
 @import "./calendar.css";
+@import "./auth-showcase.css";
+@import "./account.css";
 
 /* ── Reset body overflow so calendar.css doesn't lock all pages ── */
 body { overflow: auto; }
@@ -34,17 +40,17 @@ body { overflow: auto; }
    ════════════════════════════════════════════════════════════════════ */
 
 :root {
-    --af-bg: #050505;
-    --af-surface: #0d1117;
-    --af-surface-2: #131a24;
-    --af-border: rgba(255, 255, 255, 0.08);
-    --af-text: #f8fafc;
-    --af-text-2: #94a3b8;
-    --af-text-3: #64748b;
+    --af-bg: var(--t-050505);
+    --af-surface: var(--t-0d1117);
+    --af-surface-2: var(--t-131a24);
+    --af-border: rgba(var(--t-ink), 0.08);
+    --af-text: var(--t-f8fafc);
+    --af-text-2: var(--t-94a3b8);
+    --af-text-3: var(--t-64748b);
     --af-accent: #4f8ef7;
     --af-accent-strong: #2f6fe0;
-    --af-success: #22c55e;
-    --af-danger: #f87171;
+    --af-success: var(--t-22c55e);
+    --af-danger: var(--t-f87171);
     --af-radius: 12px;
     --af-radius-sm: 8px;
     --af-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
@@ -61,21 +67,21 @@ html {
 /* Text selection */
 ::selection {
     background: rgba(79, 142, 247, 0.35);
-    color: #fff;
+    color: var(--t-ffffff);
 }
 
 /* Slim, dark scrollbars everywhere */
 * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+    scrollbar-color: rgba(var(--t-ink), 0.16) transparent;
 }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(var(--t-ink), 0.16);
     border-radius: 8px;
 }
-*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+*::-webkit-scrollbar-thumb:hover { background: rgba(var(--t-ink), 0.28); }
 
 /* Consistent, accessible keyboard focus */
 :focus-visible {
@@ -107,7 +113,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
 /* ── Site footer (marketing surface) ── */
 .app-footer {
     border-top: 1px solid var(--af-border);
-    background: rgba(255, 255, 255, 0.015);
+    background: rgba(var(--t-ink), 0.015);
     margin-top: 80px;
 }
 .app-footer-inner {
@@ -157,9 +163,9 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
 .af-skeleton {
     display: inline-block;
     background: linear-gradient(90deg,
-        rgba(255, 255, 255, 0.04) 25%,
-        rgba(255, 255, 255, 0.09) 37%,
-        rgba(255, 255, 255, 0.04) 63%);
+        rgba(var(--t-ink), 0.04) 25%,
+        rgba(var(--t-ink), 0.09) 37%,
+        rgba(var(--t-ink), 0.04) 63%);
     background-size: 400% 100%;
     animation: af-shimmer 1.4s ease infinite;
 }
@@ -187,7 +193,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     padding: 20px;
     border: 1px solid var(--af-border);
     border-radius: var(--af-radius);
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(var(--t-ink), 0.02);
 }
 
 .af-state {
@@ -205,7 +211,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     height: 44px;
     margin-bottom: 4px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(var(--t-ink), 0.04);
     color: var(--af-text-3);
 }
 .af-state-icon-error { background: rgba(248, 113, 113, 0.1); color: var(--af-danger); }
@@ -223,12 +229,12 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     font-size: 13.5px;
     font-weight: 600;
     color: var(--af-text);
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(var(--t-ink), 0.06);
     border: 1px solid var(--af-border);
     border-radius: var(--af-radius-sm);
     cursor: pointer;
 }
-.af-retry-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.18); }
+.af-retry-btn:hover { background: rgba(var(--t-ink), 0.1); border-color: rgba(var(--t-ink), 0.18); }
 
 /* ── Settings ── */
 .settings-page { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
@@ -239,7 +245,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
 .settings-card {
     border: 1px solid var(--af-border);
     border-radius: var(--af-radius);
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(var(--t-ink), 0.02);
     padding: 24px;
 }
 .settings-card-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
@@ -247,7 +253,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     display: grid; place-items: center;
     width: 40px; height: 40px; flex: none;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(var(--t-ink), 0.06);
     color: var(--af-text);
 }
 .settings-card-head h2 { margin: 0 0 4px; font-size: 17px; font-weight: 700; color: var(--af-text); }
@@ -257,7 +263,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
 .settings-facts li { font-size: 13.5px; line-height: 1.9; color: var(--af-text-3); }
 .settings-facts code {
     padding: 1px 5px; border-radius: 4px;
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(var(--t-ink), 0.07);
     font-size: 12.5px; color: var(--af-text-2);
 }
 
@@ -298,7 +304,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
   text-align: center;
   /* Self-contained: .loading-text is defined in page-scoped stylesheets, and
      this renders above any page. */
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 14px;
 }
 
@@ -314,7 +320,7 @@ button:disabled, .btn:disabled { cursor: not-allowed; opacity: 0.6; }
     background: var(--af-surface-2);
 }
 .af-avatar-fallback {
-    color: #f8fafc;
+    color: var(--t-f8fafc);
     font-weight: 700;
     line-height: 1;
     user-select: none;

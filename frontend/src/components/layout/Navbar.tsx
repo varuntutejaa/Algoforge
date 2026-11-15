@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/config/api';
 
@@ -10,13 +10,14 @@ function getDailyId(problems: Array<{ id: string }>) {
   return problems[day % problems.length].id;
 }
 
-function StreakBadge({ getHeaders }: { getHeaders: () => HeadersInit }) {
+function StreakBadge({ getHeaders, idToken }: { getHeaders: () => HeadersInit; idToken: string | null }) {
   const [streak, setStreak] = useState(0);
   const [solvedToday, setSolvedToday] = useState(false);
   const [dailyId, setDailyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!localStorage.getItem('algoforge-id-token')) return;
+    // Wait for the session's token; the streak endpoint needs it.
+    if (!idToken) return;
     Promise.all([
       fetch(`${API_BASE_URL}/profile/streak`, { headers: getHeaders() }),
       fetch(`${API_BASE_URL}/problems`),
@@ -24,7 +25,7 @@ function StreakBadge({ getHeaders }: { getHeaders: () => HeadersInit }) {
       if (s.ok) { const d = await s.json(); setStreak(d.currentStreak || 0); setSolvedToday(!!d.solvedToday); }
       if (p.ok) { const d = await p.json(); setDailyId(getDailyId(d.problems || [])); }
     }).catch(() => {});
-  }, [getHeaders]);
+  }, [getHeaders, idToken]);
 
   const streakCls = streak === 0
     ? 'nav-streak streak-zero'
@@ -47,6 +48,7 @@ function StreakBadge({ getHeaders }: { getHeaders: () => HeadersInit }) {
 function ProfileMenu() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -58,8 +60,8 @@ function ProfileMenu() {
 
   if (!user) return (
     <div className="nav-auth-buttons">
-      <Link to="/login" className="nav-login-btn">Login</Link>
-      <Link to="/signup" className="nav-signup-btn">Get Started</Link>
+      <Link to="/login" className={`nav-login-btn${pathname === '/login' ? ' active' : ''}`}>Login</Link>
+      <Link to="/signup" className={`nav-signup-btn${pathname === '/signup' ? ' active' : ''}`}>Get Started</Link>
     </div>
   );
 
@@ -79,9 +81,15 @@ function ProfileMenu() {
       </button>
 
       <div className={`profile-dropdown${open ? ' open' : ''}`}>
+        <div className="profile-dropdown-head">
+          <strong>{user.name || user.email}</strong>
+          {user.username && <span>@{user.username}</span>}
+        </div>
         <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
         <Link to="/submissions" onClick={() => setOpen(false)}>My Submissions</Link>
+        <Link to="/github" onClick={() => setOpen(false)}>GitHub</Link>
         <Link to="/settings" onClick={() => setOpen(false)}>Settings</Link>
+        <div className="profile-dropdown-sep" role="separator" />
         <button onClick={async () => { await logout(); navigate('/'); }}>Logout</button>
       </div>
     </div>
@@ -89,7 +97,7 @@ function ProfileMenu() {
 }
 
 export default function Navbar() {
-  const { user, getHeaders } = useAuth();
+  const { user, getHeaders, idToken } = useAuth();
 
   return (
     <nav className="app-navbar">
@@ -105,7 +113,7 @@ export default function Navbar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {user && <StreakBadge getHeaders={getHeaders} />}
+        {user && <StreakBadge getHeaders={getHeaders} idToken={idToken} />}
         <ProfileMenu />
       </div>
     </nav>

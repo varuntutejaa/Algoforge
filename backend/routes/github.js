@@ -104,7 +104,7 @@ router.get('/connect', requireAuth, githubLimiter, async (req, res) => {
  */
 router.get('/callback', async (req, res) => {
     const site = frontendUrl();
-    const back = (params) => res.redirect(`${site}/settings?${new URLSearchParams(params)}`);
+    const back = (params) => res.redirect(`${site}/github?${new URLSearchParams(params)}`);
 
     try {
         if (!github.isConfigured() || !cryptoReady()) return back({ github: 'unavailable' });

@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider, authErrorMessage } from '@/config/firebase';
 import { backendAuth, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 const STRENGTH_LEVELS = [
   { text: 'Weak', className: 'level-1' },
@@ -32,7 +33,6 @@ export default function Signup() {
   const redirectTo = (location.state as { from?: string } | null)?.from || '/problems';
   const toast = useToast();
   const { login } = useAuth();
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -50,8 +50,9 @@ export default function Signup() {
       });
       if (!res.success) { toast.error(res.message || 'Sign-up failed'); return; }
       login(res.user, idToken);
+      const next = res.user.username ? redirectTo : '/welcome';
       toast.success('Welcome!');
-      setTimeout(() => navigate(redirectTo), 600);
+      setTimeout(() => navigate(next, { state: { from: redirectTo } }), 600);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
@@ -59,41 +60,31 @@ export default function Signup() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { toast.error('Name is required'); return; }
     if (!email.trim()) { toast.error('Email is required'); return; }
     if (password !== confirm) { toast.error('Passwords do not match'); return; }
     if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      // Firebase has no "name" field at creation; set it so the display name
-      // reaches the ID token (and therefore the backend) on refresh.
-      await updateProfile(cred.user, { displayName: name.trim() });
-      // Force-refresh so the freshly set displayName is present in the claims
-      // the backend reads, rather than arriving one token-refresh later.
-      const idToken = await cred.user.getIdToken(true);
-
-      const res = await backendAuth('signup', idToken, { name: name.trim() });
+      const idToken = await cred.user.getIdToken();
+      // Names and a username are chosen on the welcome step that follows.
+      const res = await backendAuth('signup', idToken);
       if (!res.success) { toast.error(res.message || 'Signup failed'); return; }
       login(res.user, idToken);
+      const next = res.user.username ? redirectTo : '/welcome';
       toast.success('Account created!');
-      setTimeout(() => navigate(redirectTo), 900);
+      setTimeout(() => navigate(next, { state: { from: redirectTo } }), 900);
     } catch (err) {
       toast.error(authErrorMessage(err));
     } finally { setLoading(false); }
   }
 
   return (
-    <main className="page auth-page">
-      <section className="form-panel">
+    <AuthLayout>
         <div className="form-card">
           <div className="form-header">
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 20, textDecoration: 'none' }}>
-              <img src="/assets/algoforge_favicon_themed.svg" alt="AlgoForge" style={{ width: 32, height: 32 }} />
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
-            </Link>
             <h2 className="form-title">Create account</h2>
-            <p className="form-sub">Join AlgoForge and start competing.</p>
+            <p className="form-sub">Join AlgoForge and start competing. You’ll pick a username next.</p>
           </div>
 
           <button type="button" className="oauth-btn" onClick={handleGoogleSignIn} disabled={loading}>
@@ -109,14 +100,6 @@ export default function Signup() {
           <div className="divider"><span>or continue with</span></div>
 
           <form className="signup-form" onSubmit={handleSubmit} noValidate>
-              <div className="field-group">
-                <label className="field-label">Full Name</label>
-                <div className="field-wrap">
-                  <input type="text" className="field-input" placeholder="Your name" value={name}
-                    onChange={e => setName(e.target.value)} autoComplete="name" />
-                </div>
-              </div>
-
               <div className="field-group">
                 <label className="field-label">Email</label>
                 <div className="field-wrap">
@@ -160,7 +143,6 @@ export default function Signup() {
             Already have an account? <Link to="/login" className="signup-link">Sign in</Link>
           </p>
         </div>
-      </section>
-    </main>
+    </AuthLayout>
   );
 }

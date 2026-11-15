@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
 import { useAuth } from '@/context/AuthContext';
+import { usePreferences, useResolvedTheme, getPreferences } from '@/lib/preferences';
 import { useToast } from '@/hooks/useToast';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { fetchProblem, submitCode, fetchAiHint, fetchCodeReview, fetchSolvedIds } from '@/api/problems';
@@ -60,16 +61,16 @@ function launchCelebration() {
   const overlay = document.createElement('div');
   Object.assign(overlay.style, { position:'fixed', inset:'0', zIndex:'10000', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(4px)' });
   const banner = document.createElement('div');
-  Object.assign(banner.style, { background:'#111827', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'20px', padding:'32px 40px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px', maxWidth:'360px', boxShadow:'0 20px 60px rgba(0,0,0,0.8)' });
+  Object.assign(banner.style, { background:'var(--t-111827)', border:'1px solid rgba(var(--t-ink),0.1)', borderRadius:'20px', padding:'32px 40px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px', maxWidth:'360px', boxShadow:'0 20px 60px rgba(0,0,0,0.8)' });
   banner.innerHTML = `
-    <div style="width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:rgba(134,239,172,0.14);color:#4ade80">
+    <div style="width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:rgba(134,239,172,0.14);color:var(--t-4ade80)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
         <path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" /><path d="M8 5H4.5a2 2 0 0 0 0 4H8" /><path d="M16 5h3.5a2 2 0 0 1 0 4H16" />
         <path d="M12 13v3" /><path d="M9 20h6" /><path d="M10.5 16h3l.5 4h-4l.5-4Z" />
       </svg>
     </div>
-    <div style="font-size:22px;font-weight:800;color:#fff">All Tests Passed!</div>
-    <div style="font-size:14px;color:#94a3b8">Your solution is correct. Nicely done!</div>
+    <div style="font-size:22px;font-weight:800;color:var(--t-f8fafc)">All Tests Passed!</div>
+    <div style="font-size:14px;color:var(--t-94a3b8)">Your solution is correct. Nicely done!</div>
     <button style="margin-top:8px;padding:10px 28px;background:#f97316;border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Continue</button>
   `;
   overlay.appendChild(banner);
@@ -121,7 +122,9 @@ export default function Editor() {
   const [probLoading, setProbLoading] = useState(true);
   const [probError, setProbError] = useState('');
 
-  const [language, setLanguage] = useState<Language>('cpp');
+  const [language, setLanguage] = useState<Language>(() => getPreferences().defaultLanguage);
+  const prefs = usePreferences();
+  const resolvedTheme = useResolvedTheme();
   const [code, setCode] = useState('');
   const [monacoReady, setMonacoReady] = useState(false);
   const monacoRef = useRef<any>(null);
@@ -339,8 +342,8 @@ export default function Editor() {
   }
   function fmtTime(secs: number) { return `${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`; }
 
-  if (probLoading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'#64748b', fontSize:14 }}>Loading…</div>;
-  if (probError) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'#f87171', fontSize:14 }}>{probError}</div>;
+  if (probLoading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--t-64748b)', fontSize:14 }}>Loading…</div>;
+  if (probError) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--t-f87171)', fontSize:14 }}>{probError}</div>;
   if (!problem) return null;
 
   // 30 of the 150 problems are design/open-ended and carry no test cases, so
@@ -476,9 +479,9 @@ export default function Editor() {
           <MonacoEditor
             height="100%"
             language={MONACO_LANG[language]}
-            theme="vs-dark"
+            theme={resolvedTheme === 'light' ? 'light' : 'vs-dark'}
             value={code}
-            options={{ fontFamily:"'DM Mono', monospace", fontSize:15, lineHeight:26, minimap:{enabled:false}, scrollBeyondLastLine:false, tabSize:2, insertSpaces:true, padding:{top:16,bottom:16}, automaticLayout:true }}
+            options={{ fontFamily:"'DM Mono', monospace", fontSize:prefs.editorFontSize, lineHeight:Math.round(prefs.editorFontSize*1.7), minimap:{enabled:false}, scrollBeyondLastLine:false, tabSize:prefs.editorTabSize, insertSpaces:true, padding:{top:16,bottom:16}, automaticLayout:true }}
             onMount={editor => {
               monacoRef.current = editor;
               setMonacoReady(true);

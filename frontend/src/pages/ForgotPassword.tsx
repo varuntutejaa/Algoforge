@@ -44,7 +44,7 @@ export default function ForgotPassword() {
           <div className="form-header">
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 20, textDecoration: 'none' }}>
               <img src="/assets/algoforge_favicon_themed.svg" alt="AlgoForge" style={{ width: 32, height: 32 }} />
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc' }}>AlgoForge</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--t-f8fafc)' }}>AlgoForge</span>
             </Link>
             <h2 className="form-title">Reset password</h2>
             <p className="form-sub">

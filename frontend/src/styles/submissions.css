@@ -8,11 +8,11 @@
 
 body{
   min-height: 100vh;
-  color: #f8fafc;
+  color: var(--t-f8fafc);
   font-family: 'Inter', sans-serif;
   background:
     radial-gradient(circle at top left, rgba(37,99,235,0.18), transparent 28%),
-    #050505;
+    var(--t-050505);
 }
 
 .submissions-page{
@@ -28,7 +28,7 @@ body{
 .section-kicker{
   display: inline-block;
   margin-bottom: 10px;
-  color: #93c5fd;
+  color: var(--t-93c5fd);
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
@@ -40,7 +40,7 @@ body{
 }
 
 .submissions-header p{
-  color: #cbd5e1;
+  color: var(--t-cbd5e1);
 }
 
 .filters-bar{
@@ -51,7 +51,7 @@ body{
 }
 
 .filters-bar label{
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 14px;
   font-weight: 700;
 }
@@ -59,18 +59,18 @@ body{
 .filters-bar select{
   min-width: 180px;
   padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(var(--t-ink), 0.12);
   border-radius: 8px;
-  color: #f8fafc;
-  background: #111827;
+  color: var(--t-f8fafc);
+  background: var(--t-111827);
   font: inherit;
 }
 
 .submissions-table-wrap{
   overflow-x: auto;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(var(--t-ink), 0.08);
   border-radius: 16px;
-  background: #0d1117;
+  background: var(--t-0d1117);
 }
 
 .submissions-table{
@@ -83,11 +83,11 @@ body{
 .submissions-table td{
   padding: 14px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(var(--t-ink), 0.06);
 }
 
 .submissions-table th{
-  color: #94a3b8;
+  color: var(--t-94a3b8);
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
@@ -101,10 +101,10 @@ body{
   font-weight: 800;
 }
 
-.verdict.accepted{ color: #86efac; }
-.verdict.wrong-answer{ color: #fdba74; }
+.verdict.accepted{ color: var(--t-86efac); }
+.verdict.wrong-answer{ color: var(--t-fdba74); }
 .verdict.runtime-error,
-.verdict.compile-error{ color: #fca5a5; }
+.verdict.compile-error{ color: var(--t-fca5a5); }
 
 @media (max-width: 640px){
   .filters-bar{

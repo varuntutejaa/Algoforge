@@ -126,7 +126,7 @@ export default function ContestResults() {
                   {problems.map((p, i) => (
                     <th key={i} className="center">
                       P{i+1}
-                      <div style={{ fontSize:10, fontWeight:400, color:'#475569', marginTop:2 }}>
+                      <div style={{ fontSize:10, fontWeight:400, color:'var(--t-475569)', marginTop:2 }}>
                         {p.title && p.title.length > 12 ? p.title.slice(0,12)+'…' : p.title}
                       </div>
                     </th>
