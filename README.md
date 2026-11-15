@@ -9,12 +9,12 @@
 [![Live](https://img.shields.io/badge/Live-frontend--xi--orpin--21.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://frontend-xi-orpin-21.vercel.app)
 [![API](https://img.shields.io/badge/API-algoforge--api.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://algoforge-api.vercel.app/health)
 
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Postgres](https://img.shields.io/badge/Postgres-Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
 [![Firebase Auth](https://img.shields.io/badge/Auth-Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Tests](https://img.shields.io/badge/tests-41%20passing-22c55e?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-98%20passing-22c55e?style=flat-square)](#testing)
 
 <br />
 
@@ -28,6 +28,7 @@
 
 - [What it does](#what-it-does) · [Try it](#try-it-in-60-seconds) · [Architecture](#architecture)
 - [The judge](#the-judge) · [Contests](#contests) · [GitHub sync](#github-sync) · [AI assist](#ai-assist)
+- [Accounts & settings](#accounts--settings)
 - [Tech stack](#tech-stack) · [Running locally](#running-locally) · [Environment](#environment)
 - [Testing](#testing) · [Deployment](#deployment) · [Project layout](#project-layout)
 
@@ -41,9 +42,10 @@ executed against hidden test cases in a sandbox, not string-matched in the brows
 | | |
 |---|---|
 | **Solve** | Monaco editor, 5 languages, per-problem/per-language autosave, time-locked AI hints |
-| **Compete** | Timed contests with a live leaderboard, penalty scoring, and a countdown that ends the round |
+| **Compete** | Public or private timed contests, a live leaderboard with avatars, penalty scoring |
 | **Track** | Submission history, streaks, a contribution heatmap, and difficulty/topic breakdowns |
 | **Ship** | Accepted solutions push straight to a GitHub repo on your account |
+| **Make it yours** | A unique username, light, dark or system theme, and your own editor defaults |
 
 ### Content at a glance
 
@@ -64,13 +66,13 @@ browsable, and the UI says so rather than pretending to grade them.
 
 ```
 1  Open   https://frontend-xi-orpin-21.vercel.app
-2  Browse problems — no account needed
-3  Hit Run — still no account needed
-4  Sign in (Google or email) only when you Submit, join, or create a contest
+2  Browse problems, public contests and the calendar — no account needed
+3  Sign in (Google or email) when you Run, Submit, join or create a contest
+4  Pick your name and a username on the welcome step, and you're in
 ```
 
-Auth is deliberately deferred: reading and running are open, and you're only asked to sign in
-at the point where something gets recorded against an account.
+Auth is deliberately deferred: reading is open, and you're only asked to sign in at the point
+where code runs on the judge or something gets recorded against an account.
 
 ---
 
@@ -78,7 +80,7 @@ at the point where something gets recorded against an account.
 
 ```
                  ┌──────────────────────────────┐
-  Browser ──────▶│  React 19 + TS  (Vercel)     │
+  Browser ──────▶│  React 18 + TS  (Vercel)     │
                  │  Monaco · SPA routing        │
                  └───────────────┬──────────────┘
                                  │  Firebase ID token (RS256)
@@ -131,7 +133,9 @@ on any mismatch. A seeder that merely *looks* right ships ungradeable problems.
 
 ## Contests
 
-Create a contest, share the join code, and compete on a live board.
+Create a contest, share the join code, and compete on a live board. Contests are **public**
+(listed for everyone, including visitors who aren't signed in) or **private** (reachable only
+with the join code).
 
 | Event | Score |
 |---|---:|
@@ -148,6 +152,12 @@ Ranking is by score, then fewer wrong attempts, then faster finish.
   verdict is never trusted — that would let anyone award themselves 100 points with `curl`.
 - **Auto-finish.** When every participant has solved everything, the contest ends early rather
   than running out the clock.
+- **Creator controls.** The creator can end a contest at any time, after a confirmation. Every
+  open arena notices within one poll and stops its clock.
+- **Only gradeable problems.** Contests draw from the 120 judged problems, whether hand-picked
+  or random, so nobody loses points on a problem that can't be graded.
+- **Private codes resist guessing.** Joining is rate-limited per user, since the code is the
+  only key to a private contest.
 
 The calendar also aggregates upcoming rounds from Codeforces, LeetCode, CodeChef, AtCoder and
 HackerRank, and is readable without an account.
@@ -166,8 +176,8 @@ algoforge-solutions/
 └── hard/median-of-two-sorted-arrays/solution.cpp
 ```
 
-Auto-push can be left off, in which case an accepted submission offers a one-off **Push to
-GitHub** button instead.
+Set it up from **GitHub** in the profile menu. Auto-push can be left off, in which case an
+accepted submission offers a one-off **Push to GitHub** button instead.
 
 **How it's kept safe**
 
@@ -191,8 +201,32 @@ and the code review only unlocks once you've actually solved the problem.
 
 | Feature | Unlocks |
 |---|---|
-| Hint 1 · 2 · 3 | Progressively, as time on the problem passes |
+| Hint 1 · 2 · 3 | At 4, 9 and 14 minutes on the problem |
 | Code review | After an accepted submission |
+
+---
+
+## Accounts & settings
+
+**Usernames.** After signing up, everyone picks a first name, an optional last name and a
+username on a short welcome step. Google sign-ups arrive with their name filled in and a
+suggested username. Availability is checked as you type.
+
+- Usernames are 3–20 characters (letters, numbers and underscores, starting with a letter),
+  stored lowercase. A unique index enforces them, so `Ada` and `ada` can't both exist, and
+  of two people racing for the same name only one save succeeds.
+- Accounts created before usernames existed are sent to the welcome step once, then back to
+  where they were going.
+- A name you choose is never overwritten by the one your sign-in provider reports.
+
+**Settings** holds your profile (names and username, changeable later), the theme, and code
+editor defaults: starting language, font size and tab width.
+
+**Light and dark themes.** Choose Dark, Light, or System to follow your device. The choice is
+stored per device and applied before the first paint, so there's no flash of the wrong theme.
+Every colour in the stylesheets reads a token from `styles/theme-tokens.css`. Each token is
+named after its dark-mode value, which keeps dark mode exactly as designed, and the light
+theme gives each one a counterpart.
 
 ---
 
@@ -200,8 +234,8 @@ and the code review only unlocks once you've actually solved the problem.
 
 | Layer | Choice |
 |---|---|
-| **Frontend** | React 19 · TypeScript · Vite · Tailwind v4 · Monaco Editor |
-| **Backend** | Node.js 22 · Express · Prisma (`@prisma/adapter-pg`) |
+| **Frontend** | React 18 · TypeScript · Vite 5 · Tailwind v4 · Monaco Editor |
+| **Backend** | Node.js 22 · Express 5 · Prisma 7 (`@prisma/adapter-pg`) |
 | **Database** | Supabase Postgres, via the connection pooler |
 | **Auth** | Firebase Auth — Google OAuth + email/password; RS256 ID tokens verified against Google's JWKS |
 | **Execution** | Judge0 — per-test-case parallel grading in a sandbox |
@@ -242,7 +276,9 @@ cp .env.example .env          # Firebase web config
 npm run dev
 ```
 
-> The API base URL switches on hostname in `frontend/src/config/api.ts` — no env var needed.
+> The API base URL is set in `frontend/src/config/api.ts`: `localhost:8000` when the page is
+> served from localhost, the production API otherwise. Set `VITE_API_URL` to point a build at
+> any other backend.
 
 ---
 
@@ -261,6 +297,7 @@ npm run dev
 | `GROQ_MODEL` | | Override the default model |
 | `ADMIN_API_KEY` | | Required in `X-Admin-Key` to create problems via the API |
 | `DB_POOL_MAX` | | Pool cap per instance (default: 2 serverless, 10 otherwise) |
+| `APP_VERSION` | | Version string reported by `/health` (default `dev`) |
 | `TOKEN_ENCRYPTION_KEY` | ◐ | 32 bytes, base64 or hex. **Required for GitHub sync** |
 | `GITHUB_CLIENT_ID` | ◐ | GitHub OAuth app |
 | `GITHUB_CLIENT_SECRET` | ◐ | GitHub OAuth app |
@@ -285,6 +322,9 @@ VITE_FIREBASE_PROJECT_ID=your-project
 VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
+
+# Optional: point the app at a different API (see Running locally)
+VITE_API_URL=
 ```
 
 > Add every domain you serve from to **Firebase Console → Authentication → Authorized domains**,
@@ -295,9 +335,11 @@ VITE_FIREBASE_APP_ID=
 ## Testing
 
 ```bash
-cd backend && node --test tests/*.test.js     # 41 tests
-cd frontend && npx tsc --noEmit && npm run build
+cd backend && npm run lint && npm test              # 59 tests (node:test)
+cd frontend && npm run lint && npm test && npm run build   # 39 tests (Vitest) + type-check
 ```
+
+CI runs the same jobs on every push and pull request, plus a dependency audit and a secret scan.
 
 The suite guards the things that are expensive to get wrong:
 
@@ -308,8 +350,14 @@ The suite guards the things that are expensive to get wrong:
 | `problemExposure` | Expected outputs never reach the public problem payload |
 | `routeMounting` | A path-less `router.use()` can't silently gate sibling routes |
 | `contestLeaderboard` | Verdicts stay server-side; the board ships with the verdict |
+| `contestControls` | Private contests stay unlisted, only the creator can end one, joins are rate-limited |
+| `contestProblems` | Contests only use problems the judge can grade |
+| `userProfile` | Username and name rules, case-insensitive uniqueness, a taken name is a 409 not a 500, sign-in never overwrites a chosen name |
 | `profilePicture` | Avatars refresh on login without a token being able to blank one |
 | `dbSupervisor` | A database blip can't take the whole process down |
+| `OnboardingGate` *(frontend)* | Accounts without a username reach the welcome step, but not before their profile has loaded |
+| `preferences` *(frontend)* | A malformed stored theme or editor setting is repaired, not trusted |
+| `ConfirmDialog` *(frontend)* | Ending a contest can't be confirmed by a reflexive Enter |
 
 Each regression test was checked by reintroducing the bug it describes and confirming it fails.
 A test that passes against the bug it's meant to catch is worth nothing.
@@ -322,7 +370,7 @@ A test that passes against the bug it's meant to catch is worth nothing.
 |---|---|---|
 | Frontend | Vercel | `vite build`; `frontend/vercel.json` rewrites all paths to `index.html` |
 | API | Vercel | Express as a serverless function |
-| Database | Supabase | Postgres via the pooler; `prisma migrate deploy` runs in the API's production build (`backend/vercel.json`), so a failed migration stops the deploy |
+| Database | Supabase | Postgres via the pooler; `prisma migrate deploy` runs in the API's production build (`backend/scripts/migrate-on-deploy.sh`), so a failed migration stops the deploy. Migrations use the session pooler (port 5432), because they hang on the transaction pooler the API itself uses |
 | Auth | Firebase | Google + email/password |
 | CI | GitHub Actions | `ci-cd.yml` — security scan, backend and frontend jobs on every push and PR |
 | Keepalive | GitHub Actions | `keepalive.yml` pings `/health` every 10 minutes |
@@ -342,19 +390,22 @@ AlgoForge/
 │   ├── config/         # Prisma singleton, DB supervisor with capped backoff
 │   ├── middleware/      # Firebase ID-token verification (jose + Google JWKS)
 │   ├── prisma/          # schema.prisma + migrations
-│   ├── routes/          # auth · problems · submissions · contests · github · ai · profile · health
+│   ├── routes/          # auth · users · problems · submissions · contests · github · ai · profile · health
 │   ├── services/        # judge0 · runners · crypto · github · githubSync · problems
-│   ├── scripts/seed/    # Problem data, harness templates, verifyHarness.js
+│   ├── scripts/         # migrate-on-deploy.sh · seed/ (problem data, harnesses, verifyHarness.js)
+│   ├── utils/           # Profile rules (usernames, names), submission helpers
 │   ├── tests/           # node:test suites
 │   └── server.js
 │
 ├── frontend/src/
 │   ├── api/            # One fetch wrapper per resource
-│   ├── components/      # Layout + shared UI
+│   ├── components/      # Layout, shared UI, the sign-in showcase
 │   ├── config/          # API base URL, Firebase init
 │   ├── context/         # AuthContext
-│   ├── pages/           # Home · Problems · Editor · Contests · ContestEditor · Dashboard · Settings · …
-│   ├── styles/          # Per-page CSS
+│   ├── hooks/           # Sign-in prompts, toasts, live username checks
+│   ├── lib/             # Theme and editor preferences, profile rules
+│   ├── pages/           # Home · Problems · Editor · Contests · Welcome · Settings · GithubSync · …
+│   ├── styles/          # Per-page CSS + theme tokens
 │   └── types/           # Shared TS types
 │
 └── .github/workflows/     # ci-cd.yml · keepalive.yml
